@@ -109,7 +109,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         'preferred_date', 'preferred_travel_date', 'date_flexibility', 'pax_count',
         'departure_city', 'lead_temperature', 'interest_level', 'booking_stage',
         'lead_source', 'assigned_team_member', 'batch_id', 'budget', 'notes',
-        'next_followup_date', 'next_followup_time', 'next_followup_status', 'updated_at'
+        'next_followup_date', 'next_followup_time', 'next_followup_status',
+        'advance_amount', 'payment_date', 'updated_at'
       ];
 
       for (const col of allowedCols) {

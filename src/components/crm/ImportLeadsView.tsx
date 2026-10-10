@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, Download, Upload, AlertTriangle, Loader2, CheckCircle2, FileSpreadsheet } from 'lucide-react';
+import { ArrowLeft, Download, Upload, AlertTriangle, Loader2, CheckCircle2, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { downloadSampleCSVTemplate, downloadSampleExcelTemplate, parseCSV, parseToISODate, normalizePhoneNumber } from '@/lib/utils';
@@ -195,6 +195,24 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
     }
   };
 
+  const handleDeleteAllLeads = async () => {
+    if (!confirm('⚠️ Are you sure you want to delete ALL leads in the database? This will allow a 100% clean re-import of your Excel file.')) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/leads/delete-all', { method: 'DELETE' });
+      if (res.ok) {
+        alert('All existing leads deleted successfully! You can now upload your Excel sheet.');
+        onSuccess();
+      } else {
+        alert('Failed to delete leads.');
+      }
+    } catch (e: any) {
+      alert('Error clearing leads: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header matching Reference Image 2 */}
@@ -205,6 +223,16 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
         >
           <ArrowLeft className="w-4 h-4 text-slate-500" /> Back to Leads
         </button>
+
+        <Button
+          onClick={handleDeleteAllLeads}
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          className="border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold gap-1.5 bg-white shadow-2xs cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> Clear / Delete All Leads
+        </Button>
       </div>
 
       <div className="max-w-3xl">

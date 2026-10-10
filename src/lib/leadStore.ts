@@ -79,3 +79,8 @@ export function deleteStoredLead(id: string): boolean {
   safeWriteLeads(current);
   return true;
 }
+
+export function clearStoredLeads(): void {
+  IN_MEMORY_LEADS = [];
+  safeWriteLeads([]);
+}

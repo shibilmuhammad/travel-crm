@@ -202,9 +202,25 @@ export async function POST(request: NextRequest) {
       try {
         const supabase = createSupabaseClient();
 
+        // Check for duplicate lead by whatsapp_number
+        let targetId = newLead.id;
+        let isDuplicate = false;
+        if (normPhone) {
+          const { data: existing } = await supabase
+            .from('leads')
+            .select('id')
+            .eq('whatsapp_number', normPhone)
+            .maybeSingle();
+
+          if (existing && existing.id) {
+            targetId = existing.id;
+            isDuplicate = true;
+          }
+        }
+
         // Primary payload compatible with full schema
         const insertPayload: Record<string, any> = {
-          id: newLead.id,
+          id: targetId,
           full_name: newLead.full_name,
           whatsapp_number: newLead.whatsapp_number,
           whatsapp_profile_name: newLead.whatsapp_profile_name,
@@ -218,9 +234,15 @@ export async function POST(request: NextRequest) {
           lead_source: newLead.lead_source,
           assigned_team_member: newLead.assigned_team_member,
           lead_temperature: newLead.lead_temperature,
+          interest_level: newLead.interest_level,
           booking_stage: newLead.booking_stage,
           pax_count: newLead.number_of_travellers,
           budget: newLead.budget_per_person ? String(newLead.budget_per_person) : null,
+          advance_amount: newLead.advance_amount,
+          payment_date: newLead.payment_date,
+          next_followup_date: newLead.next_followup_date,
+          next_followup_time: newLead.next_followup_time,
+          next_followup_status: newLead.next_followup_date ? 'pending' : null,
           notes: newLead.notes,
           batch_id: newLead.batch_id,
           created_at: newLead.created_at,
@@ -239,20 +261,28 @@ export async function POST(request: NextRequest) {
           console.warn('Supabase lead schema missing optional column, retrying with core columns:', error.message);
           
           const corePayload: Record<string, any> = {
-            id: newLead.id,
+            id: targetId,
             full_name: newLead.full_name,
             whatsapp_number: newLead.whatsapp_number,
             email: newLead.email,
             destination: newLead.preferred_destination,
+            preferred_destination: newLead.preferred_destination,
             preferred_date: newLead.preferred_travel_date,
+            preferred_travel_date: newLead.preferred_travel_date,
             date_flexibility: newLead.date_flexibility,
             pax_count: newLead.number_of_travellers,
             departure_city: newLead.departure_city,
             lead_temperature: newLead.lead_temperature,
+            interest_level: newLead.interest_level,
             booking_stage: newLead.booking_stage,
             lead_source: newLead.lead_source,
             assigned_team_member: newLead.assigned_team_member,
             batch_id: newLead.batch_id,
+            advance_amount: newLead.advance_amount,
+            payment_date: newLead.payment_date,
+            next_followup_date: newLead.next_followup_date,
+            next_followup_time: newLead.next_followup_time,
+            next_followup_status: newLead.next_followup_date ? 'pending' : null,
             notes: newLead.notes,
             created_at: newLead.created_at,
             updated_at: newLead.updated_at,
@@ -265,10 +295,10 @@ export async function POST(request: NextRequest) {
             .single();
 
           if (retryRes.data) {
-            return NextResponse.json(retryRes.data, { status: 201 });
+            return NextResponse.json({ ...retryRes.data, isDuplicate }, { status: 201 });
           }
         } else if (data) {
-          return NextResponse.json(data, { status: 201 });
+          return NextResponse.json({ ...data, isDuplicate }, { status: 201 });
         }
       } catch (dbErr: any) {
         console.error('Supabase error inserting lead:', dbErr?.message || dbErr);
