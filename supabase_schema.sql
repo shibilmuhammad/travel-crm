@@ -25,20 +25,39 @@ CREATE TABLE IF NOT EXISTS public.leads (
   email TEXT,
   whatsapp_profile_name TEXT,
   destination TEXT,
+  preferred_destination TEXT,
   preferred_date TEXT,
+  preferred_travel_date TEXT,
   date_flexibility TEXT,
   pax_count INT DEFAULT 1,
+  number_of_travellers INT DEFAULT 1,
   departure_city TEXT,
   lead_temperature TEXT DEFAULT 'new',
+  interest_level TEXT DEFAULT 'new',
   booking_stage TEXT DEFAULT 'not_contacted',
   lead_source TEXT DEFAULT 'manual_entry',
   assigned_team_member TEXT,
   batch_id TEXT,
   budget TEXT,
+  budget_per_person NUMERIC,
+  advance_amount NUMERIC,
+  payment_date TEXT,
+  next_followup_date TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure any existing leads table gets updated with new columns
+ALTER TABLE public.leads 
+ADD COLUMN IF NOT EXISTS preferred_destination TEXT,
+ADD COLUMN IF NOT EXISTS preferred_travel_date TEXT,
+ADD COLUMN IF NOT EXISTS number_of_travellers INT,
+ADD COLUMN IF NOT EXISTS budget_per_person NUMERIC,
+ADD COLUMN IF NOT EXISTS advance_amount NUMERIC,
+ADD COLUMN IF NOT EXISTS payment_date TEXT,
+ADD COLUMN IF NOT EXISTS next_followup_date TEXT,
+ADD COLUMN IF NOT EXISTS interest_level TEXT;
 
 -- 3. Trip Batches Table
 CREATE TABLE IF NOT EXISTS public.trip_batches (
@@ -58,6 +77,18 @@ CREATE TABLE IF NOT EXISTS public.trip_batches (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure trip_batches has all columns
+ALTER TABLE public.trip_batches 
+ADD COLUMN IF NOT EXISTS title TEXT,
+ADD COLUMN IF NOT EXISTS start_date TEXT,
+ADD COLUMN IF NOT EXISTS end_date TEXT,
+ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'proposed',
+ADD COLUMN IF NOT EXISTS proposed_price NUMERIC,
+ADD COLUMN IF NOT EXISTS price_per_pax NUMERIC,
+ADD COLUMN IF NOT EXISTS capacity INT DEFAULT 20,
+ADD COLUMN IF NOT EXISTS departure_city TEXT,
+ADD COLUMN IF NOT EXISTS notes TEXT;
+
 -- 4. Lead Activities Table
 CREATE TABLE IF NOT EXISTS public.lead_activities (
   id TEXT PRIMARY KEY,
@@ -72,7 +103,7 @@ CREATE TABLE IF NOT EXISTS public.lead_activities (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Disable Row Level Security (RLS) for seamless client/server CRUD or enable public policies
+-- Disable Row Level Security (RLS) for seamless client/server CRUD
 ALTER TABLE public.team_members DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leads DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trip_batches DISABLE ROW LEVEL SECURITY;

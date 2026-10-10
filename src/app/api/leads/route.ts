@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getMockLeads } from '@/lib/mockData';
 import { Lead } from '@/types';
-import { getStoredLeads, saveStoredLead, saveAllStoredLeads, updateStoredLead } from '@/lib/leadStore';
+import { getStoredLeads, saveStoredLead, saveAllStoredLeads } from '@/lib/leadStore';
+import { normalizePhoneNumber } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -31,7 +32,6 @@ export async function GET(request: NextRequest) {
       search,
       destination,
       interestLevel,
-      bookingStage,
       booking_stage: bookingStage,
       followupDate,
       leadSource,
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       query = query.or(`full_name.ilike.%${search}%,whatsapp_number.ilike.%${search}%,whatsapp_profile_name.ilike.%${search}%`);
     }
     if (destination) {
-      query = query.ilike('preferred_destination', `%${destination}%`);
+      query = query.or(`preferred_destination.ilike.%${destination}%,destination.ilike.%${destination}%`);
     }
     if (interestLevel) {
       query = query.eq('interest_level', interestLevel);
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('booking_stage', bookingStage);
     }
     if (followupDate) {
-      query = query.eq('next_followup_date', followupDate);
+      query = query.or(`next_followup_date.eq.${followupDate}`);
     }
     if (leadSource) {
       query = query.eq('lead_source', leadSource);
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('date_flexibility', dateFlexibility);
     }
     if (preferredDate) {
-      query = query.eq('preferred_travel_date', preferredDate);
+      query = query.or(`preferred_travel_date.eq.${preferredDate},preferred_date.eq.${preferredDate}`);
     }
 
     const validSorts = ['created_at', 'last_contacted_date', 'next_followup_date', 'full_name', 'interest_level'];
@@ -90,82 +90,68 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query;
 
     if (error) {
-      throw error;
+      console.error('Supabase fetch leads error, falling back to stored leads:', error);
+      const currentLeads = getStoredLeads();
+      const result = getMockLeads({ search, destination, interestLevel, bookingStage, sortBy, sortOrder }, currentLeads);
+      return NextResponse.json(result);
+    }
+
+    // Map rows to normalize field names across frontend schema and legacy Supabase schema
+    const normalizedData = (data || []).map((row: any) => ({
+      ...row,
+      preferred_destination: row.preferred_destination || row.destination || '',
+      preferred_travel_date: row.preferred_travel_date || row.preferred_date || '',
+      number_of_travellers: Number(row.number_of_travellers || row.pax_count) || 1,
+      budget_per_person: Number(row.budget_per_person || row.budget) || null,
+      lead_temperature: row.lead_temperature || row.interest_level || 'new',
+      interest_level: row.interest_level || row.lead_temperature || 'new',
+    }));
+
+    // Save fetched items to in-memory store so local cache remains synced
+    if (normalizedData.length > 0) {
+      saveAllStoredLeads(normalizedData);
     }
 
     return NextResponse.json({
-      leads: data,
-      total: count,
+      leads: normalizedData,
+      total: count || normalizedData.length,
       page,
       pageSize,
-      totalPages: Math.ceil((count || 0) / pageSize),
+      totalPages: Math.ceil((count || normalizedData.length) / pageSize),
     });
   } catch (err) {
+    console.error('Error in GET /api/leads:', err);
     const currentLeads = getStoredLeads();
     const result = getMockLeads({ search, destination, interestLevel, bookingStage, sortBy, sortOrder }, currentLeads);
     return NextResponse.json(result);
   }
 }
 
-import { normalizePhoneNumber } from '@/lib/utils';
-
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-
-  if (!isSupabaseConfigured()) {
+  try {
+    const body = await request.json();
     const nowISO = new Date().toISOString();
-    const normPhone = normalizePhoneNumber(body.whatsapp_number);
-    const inputDigits = normPhone.replace(/\D/g, '').slice(-10);
+    const normPhone = normalizePhoneNumber(body.whatsapp_number || body.phone || '');
 
-    const currentLeads = getStoredLeads();
-
-    // Duplicate detection by 10-digit phone number
-    if (inputDigits) {
-      const existingIndex = currentLeads.findIndex((l) => {
-        const lDigits = (l.whatsapp_number || '').replace(/\D/g, '').slice(-10);
-        return lDigits === inputDigits;
-      });
-
-      if (existingIndex !== -1) {
-        const existing = currentLeads[existingIndex];
-        const updatedLead: Lead = {
-          ...existing,
-          updated_at: nowISO,
-          full_name: (body.full_name && body.full_name !== normPhone) ? body.full_name : existing.full_name,
-          email: body.email || existing.email,
-          departure_city: body.departure_city || existing.departure_city,
-          preferred_destination: body.preferred_destination || existing.preferred_destination,
-          preferred_travel_date: body.preferred_travel_date || existing.preferred_travel_date,
-          batch_id: body.batch_id || existing.batch_id,
-          lead_temperature: body.lead_temperature || existing.lead_temperature,
-          interest_level: body.interest_level || existing.interest_level,
-          booking_stage: body.booking_stage || existing.booking_stage,
-          advance_amount: body.advance_amount ?? existing.advance_amount,
-          payment_date: body.payment_date || existing.payment_date,
-          notes: body.notes ? (existing.notes && existing.notes !== body.notes ? `${existing.notes} | ${body.notes}` : body.notes) : existing.notes,
-          next_followup_date: body.next_followup_date || existing.next_followup_date,
-          assigned_team_member: body.assigned_team_member || existing.assigned_team_member,
-        };
-
-        saveStoredLead(updatedLead);
-        return NextResponse.json({ ...updatedLead, isDuplicate: true }, { status: 200 });
-      }
-    }
+    const leadId = body.id || `lead-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const destination = body.preferred_destination || body.destination || '';
+    const travelDate = body.preferred_travel_date || body.preferred_date || '';
 
     const newLead: Lead = {
-      id: `lead-${Date.now()}`,
-      created_at: nowISO,
+      id: leadId,
+      created_at: body.created_at || nowISO,
       updated_at: nowISO,
       full_name: body.full_name || 'New Lead',
       whatsapp_number: normPhone,
       whatsapp_profile_name: body.whatsapp_profile_name || '',
-      lead_source: body.lead_source || 'whatsapp',
-      preferred_destination: body.preferred_destination || '',
-      preferred_travel_date: body.preferred_travel_date || '',
+      email: body.email || null,
+      lead_source: body.lead_source || 'manual_entry',
+      preferred_destination: destination,
+      preferred_travel_date: travelDate,
       date_flexibility: body.date_flexibility || 'not_decided',
       departure_city: body.departure_city || null,
       number_of_travellers: Number(body.number_of_travellers || body.pax_count) || 1,
-      budget_per_person: Number(body.budget_per_person) || null,
+      budget_per_person: body.budget_per_person ? Number(body.budget_per_person) : (body.budget ? Number(body.budget) : null),
       advance_amount: body.advance_amount ? Number(body.advance_amount) : null,
       payment_date: body.payment_date || null,
       lead_temperature: body.lead_temperature || body.interest_level || 'new',
@@ -181,49 +167,90 @@ export async function POST(request: NextRequest) {
       ad_id: body.ad_id || null,
       notes: body.notes || '',
     };
+
+    // Always update local/in-memory store first
     saveStoredLead(newLead);
-    return NextResponse.json(newLead, { status: 201 });
-  }
 
-  try {
-    const supabase = createSupabaseClient();
-    const nowISO = new Date().toISOString();
-    const leadId = body.id || `lead-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createSupabaseClient();
 
-    const insertPayload = {
-      id: leadId,
-      full_name: body.full_name || 'New Lead',
-      whatsapp_number: body.whatsapp_number || '',
-      whatsapp_profile_name: body.whatsapp_profile_name || '',
-      email: body.email || null,
-      departure_city: body.departure_city || null,
-      preferred_destination: body.preferred_destination || body.destination || '',
-      preferred_travel_date: body.preferred_travel_date || body.preferred_date || '',
-      date_flexibility: body.date_flexibility || 'not_decided',
-      lead_source: body.lead_source || 'manual_entry',
-      assigned_team_member: body.assigned_team_member || body.assigned_to || null,
-      lead_temperature: body.lead_temperature || body.interest_level || 'new',
-      booking_stage: body.booking_stage || 'not_contacted',
-      advance_amount: body.advance_amount ? Number(body.advance_amount) : null,
-      payment_date: body.payment_date || null,
-      notes: body.notes || '',
-      next_followup_date: body.next_followup_date || null,
-      batch_id: body.batch_id || null,
-      created_at: body.created_at || nowISO,
-      updated_at: nowISO,
-    };
+        // Primary payload compatible with full schema
+        const insertPayload: Record<string, any> = {
+          id: newLead.id,
+          full_name: newLead.full_name,
+          whatsapp_number: newLead.whatsapp_number,
+          whatsapp_profile_name: newLead.whatsapp_profile_name,
+          email: newLead.email,
+          departure_city: newLead.departure_city,
+          destination: newLead.preferred_destination,
+          preferred_destination: newLead.preferred_destination,
+          preferred_date: newLead.preferred_travel_date,
+          preferred_travel_date: newLead.preferred_travel_date,
+          date_flexibility: newLead.date_flexibility,
+          lead_source: newLead.lead_source,
+          assigned_team_member: newLead.assigned_team_member,
+          lead_temperature: newLead.lead_temperature,
+          booking_stage: newLead.booking_stage,
+          pax_count: newLead.number_of_travellers,
+          budget: newLead.budget_per_person ? String(newLead.budget_per_person) : null,
+          notes: newLead.notes,
+          batch_id: newLead.batch_id,
+          created_at: newLead.created_at,
+          updated_at: newLead.updated_at,
+        };
 
-    const { data, error } = await supabase.from('leads').insert([insertPayload]).select().single();
-    if (error) {
-      console.error('Supabase lead insert error:', error);
-      // Fallback save locally if Supabase table is not set up
-      saveStoredLead(insertPayload);
-      return NextResponse.json(insertPayload, { status: 201 });
+        // Try upserting full payload
+        let { data, error } = await supabase
+          .from('leads')
+          .upsert([insertPayload], { onConflict: 'id' })
+          .select()
+          .single();
+
+        // If schema missing columns (PGRST204 error), strip extra columns and retry!
+        if (error && (error.code === 'PGRST204' || error.message.includes('column'))) {
+          console.warn('Supabase lead schema missing optional column, retrying with core columns:', error.message);
+          
+          const corePayload: Record<string, any> = {
+            id: newLead.id,
+            full_name: newLead.full_name,
+            whatsapp_number: newLead.whatsapp_number,
+            email: newLead.email,
+            destination: newLead.preferred_destination,
+            preferred_date: newLead.preferred_travel_date,
+            date_flexibility: newLead.date_flexibility,
+            pax_count: newLead.number_of_travellers,
+            departure_city: newLead.departure_city,
+            lead_temperature: newLead.lead_temperature,
+            booking_stage: newLead.booking_stage,
+            lead_source: newLead.lead_source,
+            assigned_team_member: newLead.assigned_team_member,
+            batch_id: newLead.batch_id,
+            notes: newLead.notes,
+            created_at: newLead.created_at,
+            updated_at: newLead.updated_at,
+          };
+
+          const retryRes = await supabase
+            .from('leads')
+            .upsert([corePayload], { onConflict: 'id' })
+            .select()
+            .single();
+
+          if (retryRes.data) {
+            return NextResponse.json(retryRes.data, { status: 201 });
+          }
+        } else if (data) {
+          return NextResponse.json(data, { status: 201 });
+        }
+      } catch (dbErr: any) {
+        console.error('Supabase error inserting lead:', dbErr?.message || dbErr);
+      }
     }
-    saveStoredLead(data);
-    return NextResponse.json(data, { status: 201 });
+
+    return NextResponse.json(newLead, { status: 201 });
   } catch (err: any) {
-    console.error('Failed to insert lead to Supabase:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Failed to create lead:', err);
+    return NextResponse.json({ error: err.message || 'Failed to create lead' }, { status: 500 });
   }
 }
