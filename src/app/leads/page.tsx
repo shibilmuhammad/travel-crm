@@ -179,6 +179,15 @@ export default function LeadsPage() {
           onClose={() => setViewLead(null)}
           onUpdate={async () => {
             fetchLeads();
+            try {
+              const res = await fetch(`/api/leads/${viewLead.id}`);
+              if (res.ok) {
+                const updated = await res.json();
+                setViewLead(updated);
+              }
+            } catch (e) {
+              console.error(e);
+            }
           }}
           onEdit={(l) => setEditLead(l)}
           onDelete={(id) => handleDelete(id)}

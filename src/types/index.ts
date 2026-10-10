@@ -62,7 +62,9 @@ export interface Lead {
   email?: string | null;
   whatsapp_profile_name?: string | null;
   preferred_destination?: string | null;
+  destination?: string | null;
   preferred_travel_date?: string | null; // ISO date string
+  preferred_date?: string | null;
   date_flexibility?: DateFlexibility;
   departure_city?: string | null;
   number_of_travellers?: number;

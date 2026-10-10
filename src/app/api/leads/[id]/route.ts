@@ -21,8 +21,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const normalized = {
       ...data,
       preferred_destination: data.preferred_destination || data.destination || '',
+      destination: data.destination || data.preferred_destination || '',
       preferred_travel_date: data.preferred_travel_date || data.preferred_date || '',
+      preferred_date: data.preferred_date || data.preferred_travel_date || '',
       number_of_travellers: Number(data.number_of_travellers || data.pax_count) || 1,
+      pax_count: Number(data.pax_count || data.number_of_travellers) || 1,
       budget_per_person: Number(data.budget_per_person || data.budget) || null,
       lead_temperature: data.lead_temperature || data.interest_level || 'new',
       interest_level: data.interest_level || data.lead_temperature || 'new',
@@ -47,6 +50,31 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updates.whatsapp_number = normalizePhoneNumber(updates.whatsapp_number);
   }
 
+  // Ensure dual column alias synchronization
+  if (updates.preferred_destination) {
+    updates.destination = updates.preferred_destination;
+  } else if (updates.destination) {
+    updates.preferred_destination = updates.destination;
+  }
+
+  if (updates.preferred_travel_date) {
+    updates.preferred_date = updates.preferred_travel_date;
+  } else if (updates.preferred_date) {
+    updates.preferred_travel_date = updates.preferred_date;
+  }
+
+  if (updates.lead_temperature) {
+    updates.interest_level = updates.lead_temperature;
+  } else if (updates.interest_level) {
+    updates.lead_temperature = updates.interest_level;
+  }
+
+  if (updates.number_of_travellers) {
+    updates.pax_count = updates.number_of_travellers;
+  } else if (updates.pax_count) {
+    updates.number_of_travellers = updates.pax_count;
+  }
+
   // Always update local/in-memory store first
   const updatedLocal = updateStoredLead(id, updates);
 
@@ -60,20 +88,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Primary formatted payload for Supabase update
     const patchPayload: Record<string, any> = { ...updates };
-    if (updates.preferred_destination) {
-      patchPayload.destination = updates.preferred_destination;
-    }
-    if (updates.preferred_travel_date) {
-      patchPayload.preferred_date = updates.preferred_travel_date;
-    }
-    if (updates.number_of_travellers) {
-      patchPayload.pax_count = updates.number_of_travellers;
-    }
     if (updates.budget_per_person) {
       patchPayload.budget = String(updates.budget_per_person);
-    }
-    if (updates.interest_level && !updates.lead_temperature) {
-      patchPayload.lead_temperature = updates.interest_level;
     }
 
     let { data, error } = await supabase
@@ -83,7 +99,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .select()
       .single();
 
-    // Fallback if schema is missing an optional column
+    // Fallback if schema is missing an optional column (PGRST204)
     if (error && (error.code === 'PGRST204' || error.message.includes('column'))) {
       console.warn('Supabase lead patch missing column, retrying with core columns:', error.message);
       
@@ -92,7 +108,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         'full_name', 'whatsapp_number', 'email', 'destination', 'preferred_destination',
         'preferred_date', 'preferred_travel_date', 'date_flexibility', 'pax_count',
         'departure_city', 'lead_temperature', 'interest_level', 'booking_stage',
-        'lead_source', 'assigned_team_member', 'batch_id', 'budget', 'notes', 'updated_at'
+        'lead_source', 'assigned_team_member', 'batch_id', 'budget', 'notes',
+        'next_followup_date', 'next_followup_time', 'next_followup_status', 'updated_at'
       ];
 
       for (const col of allowedCols) {
@@ -123,8 +140,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const normalized = {
       ...data,
       preferred_destination: data.preferred_destination || data.destination || '',
+      destination: data.destination || data.preferred_destination || '',
       preferred_travel_date: data.preferred_travel_date || data.preferred_date || '',
+      preferred_date: data.preferred_date || data.preferred_travel_date || '',
       number_of_travellers: Number(data.number_of_travellers || data.pax_count) || 1,
+      pax_count: Number(data.pax_count || data.number_of_travellers) || 1,
       budget_per_person: Number(data.budget_per_person || data.budget) || null,
       lead_temperature: data.lead_temperature || data.interest_level || 'new',
       interest_level: data.interest_level || data.lead_temperature || 'new',
