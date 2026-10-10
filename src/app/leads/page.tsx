@@ -104,6 +104,18 @@ export default function LeadsPage() {
     fetchLeads(filters);
   };
 
+  const handleDeleteLead = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this lead?')) return;
+    try {
+      const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        await fetchLeads();
+      }
+    } catch (e) {
+      console.error('Failed to delete lead:', e);
+    }
+  };
+
   const handleClearFilters = () => {
     const empty: LeadFilters & { month?: string } = {
       search: '',
@@ -504,14 +516,24 @@ export default function LeadsPage() {
                         </td>
 
                         <td className="px-4 py-4 text-right">
-                          <Button
-                            onClick={() => setViewLead(lead)}
-                            variant="outline"
-                            size="sm"
-                            className="border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-medium gap-1.5"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> View
-                          </Button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              onClick={() => setViewLead(lead)}
+                              variant="outline"
+                              size="sm"
+                              className="border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-medium gap-1.5"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> View
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteLead(lead.id)}
+                              variant="outline"
+                              size="sm"
+                              className="border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium gap-1.5"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-600" /> Delete
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
