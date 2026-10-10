@@ -108,26 +108,33 @@ export default function FollowupsPage() {
 
   // Group leads into tab categories using normalized date strings
   const todayList = filteredLeadsByStaff.filter((l) => {
-    if (l.next_followup_status === 'completed') return false;
+    if (l.next_followup_status === 'completed' || l.booking_stage === 'lost_closed' || l.booking_stage === 'booking_confirmed') {
+      return false;
+    }
     const dateStr = parseISODate(l.next_followup_date);
-    return dateStr === todayStr;
+    // Scheduled for today OR active unassigned leads ready to call today!
+    return dateStr === todayStr || !dateStr;
   });
 
   const overdueList = filteredLeadsByStaff.filter((l) => {
-    if (l.next_followup_status === 'completed') return false;
+    if (l.next_followup_status === 'completed' || l.booking_stage === 'lost_closed' || l.booking_stage === 'booking_confirmed') {
+      return false;
+    }
     const dateStr = parseISODate(l.next_followup_date);
     return Boolean(dateStr && dateStr < todayStr);
   });
 
   const upcomingList = filteredLeadsByStaff.filter((l) => {
-    if (l.next_followup_status === 'completed' || l.booking_stage === 'lost_closed') return false;
+    if (l.next_followup_status === 'completed' || l.booking_stage === 'lost_closed' || l.booking_stage === 'booking_confirmed') {
+      return false;
+    }
     const dateStr = parseISODate(l.next_followup_date);
-    // Include future scheduled dates OR active leads without a date assigned yet
-    return dateStr > todayStr || !dateStr;
+    // Future scheduled dates
+    return Boolean(dateStr && dateStr > todayStr);
   });
 
   const doneList = filteredLeadsByStaff.filter(
-    (l) => l.next_followup_status === 'completed'
+    (l) => l.next_followup_status === 'completed' || l.booking_stage === 'booking_confirmed'
   );
 
   const tabLists: Record<TabType, Lead[]> = {
