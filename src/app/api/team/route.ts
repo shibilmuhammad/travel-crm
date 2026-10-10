@@ -77,14 +77,15 @@ export async function POST(request: NextRequest) {
           created_at: newMember.created_at,
         };
 
+        // Use upsert so existing records update password and user details seamlessly
         const { data, error } = await supabase
           .from('team_members')
-          .insert([fullPayload])
+          .upsert([fullPayload], { onConflict: 'email' })
           .select()
           .single();
 
         if (error) {
-          console.error('Supabase team_members insert error, trying fallback:', error.message);
+          console.error('Supabase team_members upsert error, trying fallback:', error.message);
           const fallbackPayload = {
             id: newMember.id,
             full_name: newMember.full_name,
@@ -93,12 +94,12 @@ export async function POST(request: NextRequest) {
 
           const { data: fbData, error: fbError } = await supabase
             .from('team_members')
-            .insert([fallbackPayload])
+            .upsert([fallbackPayload], { onConflict: 'email' })
             .select()
             .single();
 
           if (fbError) {
-            console.error('Fallback team member insert error:', fbError.message);
+            console.error('Fallback team member upsert error:', fbError.message);
           } else if (fbData) {
             return NextResponse.json(fbData, { status: 201 });
           }
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(data, { status: 201 });
         }
       } catch (dbErr: any) {
-        console.error('Supabase error inserting team member:', dbErr?.message || dbErr);
+        console.error('Supabase error upserting team member:', dbErr?.message || dbErr);
       }
     }
 
