@@ -341,8 +341,8 @@ export let MOCK_BATCHES: TripBatch[] = [
   },
 ];
 
-export function getMockLeads(filters: Record<string, string>) {
-  let leads = [...MOCK_LEADS];
+export function getMockLeads(filters: Record<string, string>, leadList?: Lead[]) {
+  let leads = leadList ? [...leadList] : [...MOCK_LEADS];
 
   if (filters.search) {
     const s = filters.search.toLowerCase();

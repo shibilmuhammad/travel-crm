@@ -78,6 +78,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  useEffect(() => {
+    // Restore session instantly from localStorage on page refresh
+    const authFlag = localStorage.getItem('is_authenticated');
+    const savedUserData = localStorage.getItem('active_user_data');
+
+    if (authFlag === 'true') {
+      setIsAuthenticated(true);
+      if (savedUserData) {
+        try {
+          const parsed = JSON.parse(savedUserData);
+          if (parsed && parsed.id) {
+            setCurrentUser(parsed);
+          }
+        } catch (e) {
+          console.error('Error parsing saved user data:', e);
+        }
+      }
+    } else {
+      setIsAuthenticated(false);
+    }
+    setInitialized(true);
+  }, []);
+
   const fetchTeam = async () => {
     try {
       const res = await fetch('/api/team');
@@ -90,7 +113,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       const stored = loadStoredMembers();
-      // Combine API/Mock + custom stored members uniquely by email/id
       const combinedMap = new Map<string, TeamMember>();
       MOCK_TEAM_MEMBERS.forEach(m => combinedMap.set((m.email || m.id).toLowerCase(), m));
       apiMembers.forEach(m => combinedMap.set((m.email || m.id).toLowerCase(), m));
@@ -100,9 +122,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setTeamMembers(allMembers);
 
       const savedId = localStorage.getItem('active_user_id');
-      if (savedId) {
+      if (savedId && allMembers.length > 0) {
         const found = allMembers.find((m) => m.id === savedId || m.email === savedId);
-        if (found) setCurrentUser(found);
+        if (found) {
+          setCurrentUser(found);
+          localStorage.setItem('active_user_data', JSON.stringify(found));
+        }
       }
     } catch (e) {
       console.error('Failed to load team members:', e);
@@ -112,26 +137,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     fetchTeam();
   }, []);
-
-  useEffect(() => {
-    const authFlag = localStorage.getItem('is_authenticated');
-    const savedUserId = localStorage.getItem('active_user_id');
-
-    if (authFlag === 'true' && savedUserId && teamMembers.length > 0) {
-      const found = teamMembers.find((m) => m.id === savedUserId || m.email === savedUserId);
-      if (found) {
-        setCurrentUser(found);
-        setIsAuthenticated(true);
-      } else {
-        setIsAuthenticated(false);
-      }
-    } else if (authFlag === 'true' && teamMembers.length > 0) {
-      setIsAuthenticated(true);
-    } else {
-      setIsAuthenticated(false);
-    }
-    setInitialized(true);
-  }, [teamMembers]);
 
   // Route protection
   useEffect(() => {
@@ -144,6 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(user);
     setIsAuthenticated(true);
     localStorage.setItem('active_user_id', user.id);
+    localStorage.setItem('active_user_data', JSON.stringify(user));
     localStorage.setItem('is_authenticated', 'true');
   };
 
@@ -255,6 +261,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setIsAuthenticated(false);
     localStorage.setItem('is_authenticated', 'false');
+    localStorage.removeItem('active_user_id');
+    localStorage.removeItem('active_user_data');
     router.push('/login');
   };
 

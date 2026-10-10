@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
-import { MOCK_LEADS } from '@/lib/mockData';
+import { getStoredLeads, updateStoredLead, deleteStoredLead } from '@/lib/leadStore';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   if (!isSupabaseConfigured()) {
-    const lead = MOCK_LEADS.find((l) => l.id === id);
+    const leads = getStoredLeads();
+    const lead = leads.find((l) => l.id === id);
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     return NextResponse.json(lead);
   }
@@ -17,7 +18,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (error) throw error;
     return NextResponse.json(data);
   } catch (err: any) {
-    const lead = MOCK_LEADS.find((l) => l.id === id);
+    const leads = getStoredLeads();
+    const lead = leads.find((l) => l.id === id);
     if (lead) return NextResponse.json(lead);
     return NextResponse.json({ error: err.message || 'Lead not found' }, { status: 404 });
   }
@@ -35,10 +37,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   if (!isSupabaseConfigured()) {
-    const index = MOCK_LEADS.findIndex((l) => l.id === id);
-    if (index === -1) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
-    MOCK_LEADS[index] = { ...MOCK_LEADS[index], ...updates };
-    return NextResponse.json(MOCK_LEADS[index]);
+    const updated = updateStoredLead(id, updates);
+    if (!updated) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    return NextResponse.json(updated);
   }
 
   try {
@@ -60,8 +61,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { id } = await params;
 
   if (!isSupabaseConfigured()) {
-    const index = MOCK_LEADS.findIndex((l) => l.id === id);
-    if (index !== -1) MOCK_LEADS.splice(index, 1);
+    deleteStoredLead(id);
     return NextResponse.json({ success: true });
   }
 
@@ -74,3 +74,4 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+

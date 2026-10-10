@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
-import { MOCK_LEADS, getMockLeads } from '@/lib/mockData';
+import { getMockLeads } from '@/lib/mockData';
 import { Lead } from '@/types';
+import { getStoredLeads, saveStoredLead, saveAllStoredLeads, updateStoredLead } from '@/lib/leadStore';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
   const month = searchParams.get('month') || '';
 
   if (!isSupabaseConfigured()) {
+    const currentLeads = getStoredLeads();
     const result = getMockLeads({
       search,
       destination,
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
       sortOrder,
       page: page.toString(),
       pageSize: pageSize.toString(),
-    });
+    }, currentLeads);
     return NextResponse.json(result);
   }
 
@@ -114,15 +116,17 @@ export async function POST(request: NextRequest) {
     const normPhone = normalizePhoneNumber(body.whatsapp_number);
     const inputDigits = normPhone.replace(/\D/g, '').slice(-10);
 
+    const currentLeads = getStoredLeads();
+
     // Duplicate detection by 10-digit phone number
     if (inputDigits) {
-      const existingIndex = MOCK_LEADS.findIndex((l) => {
+      const existingIndex = currentLeads.findIndex((l) => {
         const lDigits = (l.whatsapp_number || '').replace(/\D/g, '').slice(-10);
         return lDigits === inputDigits;
       });
 
       if (existingIndex !== -1) {
-        const existing = MOCK_LEADS[existingIndex];
+        const existing = currentLeads[existingIndex];
         const updatedLead: Lead = {
           ...existing,
           updated_at: nowISO,
@@ -142,7 +146,7 @@ export async function POST(request: NextRequest) {
           assigned_team_member: body.assigned_team_member || existing.assigned_team_member,
         };
 
-        MOCK_LEADS[existingIndex] = updatedLead;
+        saveStoredLead(updatedLead);
         return NextResponse.json({ ...updatedLead, isDuplicate: true }, { status: 200 });
       }
     }
@@ -176,7 +180,7 @@ export async function POST(request: NextRequest) {
       ad_id: body.ad_id || null,
       notes: body.notes || '',
     };
-    MOCK_LEADS.unshift(newLead);
+    saveStoredLead(newLead);
     return NextResponse.json(newLead, { status: 201 });
   }
 
