@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
-import { MOCK_BATCHES } from '@/lib/mockData';
+import { getStoredBatches, saveStoredBatch } from '@/lib/batchStore';
 import { TripBatch } from '@/types';
 
 export async function GET() {
   if (!isSupabaseConfigured()) {
-    return NextResponse.json(MOCK_BATCHES);
+    return NextResponse.json(getStoredBatches());
   }
 
   try {
@@ -15,26 +15,39 @@ export async function GET() {
       .select('*')
       .order('proposed_date', { ascending: true });
 
-    if (error) throw error;
-    return NextResponse.json(data);
+    if (error) {
+      console.error('Supabase error fetching batches, using local store:', error);
+      return NextResponse.json(getStoredBatches());
+    }
+
+    if (data && data.length > 0) {
+      return NextResponse.json(data);
+    }
+    return NextResponse.json(getStoredBatches());
   } catch (err) {
-    return NextResponse.json(MOCK_BATCHES);
+    console.error('Error fetching batches:', err);
+    return NextResponse.json(getStoredBatches());
   }
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-
-  if (!isSupabaseConfigured()) {
+  try {
+    const body = await request.json();
     const nowISO = new Date().toISOString();
+    const todayDateStr = nowISO.split('T')[0];
+
+    const batchId = body.id || `batch-${Date.now()}`;
+    const destination = body.destination || body.title || 'New Trip';
+    const proposedDate = body.proposed_date || body.start_date || todayDateStr;
+
     const newBatch: TripBatch = {
-      id: `batch-${Date.now()}`,
-      title: body.title || `${body.destination} Batch`,
-      created_at: nowISO,
-      updated_at: nowISO,
-      destination: body.destination || 'New Trip',
-      proposed_date: body.start_date || body.proposed_date || nowISO.split('T')[0],
-      start_date: body.start_date || body.proposed_date || nowISO.split('T')[0],
+      id: batchId,
+      title: body.title || `${destination} Batch`,
+      created_at: body.created_at || nowISO,
+      updated_at: body.updated_at || nowISO,
+      destination: destination,
+      proposed_date: proposedDate,
+      start_date: body.start_date || proposedDate,
       end_date: body.end_date || null,
       capacity: Number(body.total_capacity || body.capacity) || 12,
       total_capacity: Number(body.total_capacity || body.capacity) || 12,
@@ -45,16 +58,49 @@ export async function POST(request: NextRequest) {
       price_per_pax: Number(body.price_per_pax || body.proposed_price) || 0,
       notes: body.notes || '',
     };
-    MOCK_BATCHES.unshift(newBatch);
-    return NextResponse.json(newBatch, { status: 201 });
-  }
 
-  try {
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase.from('trip_batches').insert([body]).select().single();
-    if (error) throw error;
-    return NextResponse.json(data, { status: 201 });
+    // Save to local JSON store as primary/fallback
+    saveStoredBatch(newBatch);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createSupabaseClient();
+        const insertPayload = {
+          id: newBatch.id,
+          destination: newBatch.destination,
+          proposed_date: newBatch.proposed_date,
+          title: newBatch.title,
+          start_date: newBatch.start_date,
+          end_date: newBatch.end_date,
+          status: newBatch.status,
+          proposed_price: newBatch.proposed_price,
+          price_per_pax: newBatch.price_per_pax,
+          capacity: newBatch.capacity,
+          departure_city: newBatch.departure_city,
+          notes: newBatch.notes,
+          created_at: newBatch.created_at,
+          updated_at: newBatch.updated_at,
+        };
+
+        const { data, error } = await supabase
+          .from('trip_batches')
+          .insert([insertPayload])
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Supabase insert batch error (saved to local fallback):', error);
+        } else if (data) {
+          return NextResponse.json(data, { status: 201 });
+        }
+      } catch (dbErr) {
+        console.error('Supabase client error on batch insert:', dbErr);
+      }
+    }
+
+    return NextResponse.json(newBatch, { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Error creating batch:', err);
+    return NextResponse.json({ error: err.message || 'Failed to create batch' }, { status: 500 });
   }
 }
