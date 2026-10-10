@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       notes: body.notes || '',
     };
 
-    // Save to local JSON store as primary/fallback
+    // Always update in-memory / local fallback store first
     saveStoredBatch(newBatch);
 
     if (isSupabaseConfigured()) {
@@ -89,12 +89,32 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (error) {
-          console.error('Supabase insert batch error (saved to local fallback):', error);
+          console.error('Supabase batch insert error:', error.message, error.details);
+          // Try minimal payload if extra fields caused column mismatch
+          const minPayload = {
+            id: newBatch.id,
+            destination: newBatch.destination,
+            proposed_date: newBatch.proposed_date,
+            title: newBatch.title,
+            status: newBatch.status,
+            capacity: newBatch.capacity,
+          };
+          const { data: minData, error: minError } = await supabase
+            .from('trip_batches')
+            .insert([minPayload])
+            .select()
+            .single();
+
+          if (minError) {
+            console.error('Supabase min batch insert error:', minError.message);
+          } else if (minData) {
+            return NextResponse.json(minData, { status: 201 });
+          }
         } else if (data) {
           return NextResponse.json(data, { status: 201 });
         }
-      } catch (dbErr) {
-        console.error('Supabase client error on batch insert:', dbErr);
+      } catch (dbErr: any) {
+        console.error('Supabase client error on batch insert:', dbErr?.message || dbErr);
       }
     }
 
