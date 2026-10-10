@@ -23,8 +23,20 @@ import {
 import { formatDate, formatPhoneNumber, getCallLink, getWhatsAppLink } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
-type TabType = 'today' | 'overdue' | 'upcoming' | 'done';
+type TabType = 'today' | 'overdue' | 'upcoming' | 'all_pending' | 'done';
 type SortField = 'scheduled' | 'booking_stage' | 'lead_status' | 'name' | 'last_contacted';
+
+function parseISODate(val?: string | null): string {
+  if (!val || !val.trim()) return '';
+  const clean = val.trim();
+  if (clean.includes('T')) return clean.split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+  const d = new Date(clean);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
+  return clean;
+}
 
 export default function FollowupsPage() {
   const { currentUser, isTelecaller, teamMembers } = useAuth();
@@ -94,16 +106,32 @@ export default function FollowupsPage() {
     return true;
   });
 
-  // Group leads into tab categories
-  const todayList = filteredLeadsByStaff.filter(
-    (l) => l.next_followup_date === todayStr && l.next_followup_status !== 'completed'
+  // Group leads into tab categories using normalized date strings
+  const todayList = filteredLeadsByStaff.filter((l) => {
+    if (l.next_followup_status === 'completed') return false;
+    const dateStr = parseISODate(l.next_followup_date);
+    if (dateStr === todayStr) return true;
+    // Include leads marked for follow up that have no date assigned yet
+    if (!dateStr && (l.booking_stage === 'follow_up_required' || l.booking_stage === 'contacted')) return true;
+    return false;
+  });
+
+  const overdueList = filteredLeadsByStaff.filter((l) => {
+    if (l.next_followup_status === 'completed') return false;
+    const dateStr = parseISODate(l.next_followup_date);
+    return Boolean(dateStr && dateStr < todayStr);
+  });
+
+  const upcomingList = filteredLeadsByStaff.filter((l) => {
+    if (l.next_followup_status === 'completed') return false;
+    const dateStr = parseISODate(l.next_followup_date);
+    return Boolean(dateStr && dateStr > todayStr);
+  });
+
+  const allPendingList = filteredLeadsByStaff.filter(
+    (l) => l.next_followup_status !== 'completed' && l.booking_stage !== 'lost_closed'
   );
-  const overdueList = filteredLeadsByStaff.filter(
-    (l) => l.next_followup_date && l.next_followup_date < todayStr && l.next_followup_status !== 'completed'
-  );
-  const upcomingList = filteredLeadsByStaff.filter(
-    (l) => l.next_followup_date && l.next_followup_date > todayStr && l.next_followup_status !== 'completed'
-  );
+
   const doneList = filteredLeadsByStaff.filter(
     (l) => l.next_followup_status === 'completed'
   );
@@ -112,6 +140,7 @@ export default function FollowupsPage() {
     today: todayList,
     overdue: overdueList,
     upcoming: upcomingList,
+    all_pending: allPendingList,
     done: doneList,
   };
 
@@ -269,6 +298,22 @@ export default function FollowupsPage() {
                 activeTab === 'upcoming' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
               }`}>
                 {upcomingList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('all_pending')}
+              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'all_pending'
+                  ? 'bg-blue-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              }`}
+            >
+              All Pending
+              <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
+                activeTab === 'all_pending' ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {allPendingList.length}
               </span>
             </button>
 
