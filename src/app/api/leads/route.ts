@@ -101,7 +101,8 @@ export async function GET(request: NextRequest) {
       totalPages: Math.ceil((count || 0) / pageSize),
     });
   } catch (err) {
-    const result = getMockLeads({ search, destination, interestLevel, bookingStage, sortBy, sortOrder });
+    const currentLeads = getStoredLeads();
+    const result = getMockLeads({ search, destination, interestLevel, bookingStage, sortBy, sortOrder }, currentLeads);
     return NextResponse.json(result);
   }
 }
@@ -186,10 +187,43 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.from('leads').insert([body]).select().single();
-    if (error) throw error;
+    const nowISO = new Date().toISOString();
+    const leadId = body.id || `lead-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const insertPayload = {
+      id: leadId,
+      full_name: body.full_name || 'New Lead',
+      whatsapp_number: body.whatsapp_number || '',
+      whatsapp_profile_name: body.whatsapp_profile_name || '',
+      email: body.email || null,
+      departure_city: body.departure_city || null,
+      preferred_destination: body.preferred_destination || body.destination || '',
+      preferred_travel_date: body.preferred_travel_date || body.preferred_date || '',
+      date_flexibility: body.date_flexibility || 'not_decided',
+      lead_source: body.lead_source || 'manual_entry',
+      assigned_team_member: body.assigned_team_member || body.assigned_to || null,
+      lead_temperature: body.lead_temperature || body.interest_level || 'new',
+      booking_stage: body.booking_stage || 'not_contacted',
+      advance_amount: body.advance_amount ? Number(body.advance_amount) : null,
+      payment_date: body.payment_date || null,
+      notes: body.notes || '',
+      next_followup_date: body.next_followup_date || null,
+      batch_id: body.batch_id || null,
+      created_at: body.created_at || nowISO,
+      updated_at: nowISO,
+    };
+
+    const { data, error } = await supabase.from('leads').insert([insertPayload]).select().single();
+    if (error) {
+      console.error('Supabase lead insert error:', error);
+      // Fallback save locally if Supabase table is not set up
+      saveStoredLead(insertPayload);
+      return NextResponse.json(insertPayload, { status: 201 });
+    }
+    saveStoredLead(data);
     return NextResponse.json(data, { status: 201 });
   } catch (err: any) {
+    console.error('Failed to insert lead to Supabase:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
