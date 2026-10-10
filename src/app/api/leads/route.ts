@@ -268,51 +268,43 @@ export async function POST(request: NextRequest) {
           updated_at: newLead.updated_at,
         };
 
-        // Try upserting full payload
+        // Dynamic column stripping loop: if Supabase complains a column is missing in schema, strip it and retry
+        let currentPayload: Record<string, any> = { ...insertPayload };
         let { data, error } = await supabase
           .from('leads')
-          .upsert([insertPayload], { onConflict: 'id' })
+          .upsert([currentPayload], { onConflict: 'id' })
           .select()
           .single();
 
-        // Fallback 1: If optional columns (like advance_amount) are missing in Supabase schema (PGRST204), try with followup columns
-        if (error && (error.code === 'PGRST204' || error.message.includes('column'))) {
-          console.warn('Supabase lead schema missing optional column, retrying with core + followup columns:', error.message);
-          
-          const followupPayload: Record<string, any> = { ...insertPayload };
-          delete followupPayload.advance_amount;
-          delete followupPayload.payment_date;
+        let retries = 15;
+        while (error && (error.code === 'PGRST204' || error.message.includes('column')) && retries > 0) {
+          retries--;
+          const match = error.message.match(/Could not find the '([^']+)' column/i);
+          if (match && match[1]) {
+            const missingCol = match[1];
+            console.warn(`Supabase missing column '${missingCol}', stripping and retrying...`);
+            delete currentPayload[missingCol];
+          } else {
+            const ABSOLUTE_MINIMAL_COLS = [
+              'id', 'full_name', 'whatsapp_number', 'destination', 'preferred_date',
+              'lead_temperature', 'booking_stage', 'lead_source', 'assigned_team_member',
+              'created_at', 'updated_at'
+            ];
+            const minimalPayload: Record<string, any> = {};
+            for (const c of ABSOLUTE_MINIMAL_COLS) {
+              if (c in currentPayload) minimalPayload[c] = currentPayload[c];
+            }
+            currentPayload = minimalPayload;
+          }
 
-          const retry1 = await supabase
+          const retryRes = await supabase
             .from('leads')
-            .upsert([followupPayload], { onConflict: 'id' })
+            .upsert([currentPayload], { onConflict: 'id' })
             .select()
             .single();
 
-          if (retry1.data) {
-            data = retry1.data;
-            error = null;
-          } else if (retry1.error) {
-            // Fallback 2: Strictly use SAFE_CORE_COLUMNS only
-            console.warn('Retrying insert with pure core columns:', retry1.error.message);
-            const pureCorePayload: Record<string, any> = {};
-            for (const col of SAFE_CORE_COLUMNS) {
-              if (col in insertPayload && insertPayload[col] !== undefined) {
-                pureCorePayload[col] = insertPayload[col];
-              }
-            }
-
-            const retry2 = await supabase
-              .from('leads')
-              .upsert([pureCorePayload], { onConflict: 'id' })
-              .select()
-              .single();
-
-            if (retry2.data) {
-              data = retry2.data;
-              error = null;
-            }
-          }
+          data = retryRes.data;
+          error = retryRes.error;
         }
 
         if (data) {

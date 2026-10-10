@@ -92,44 +92,39 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       patchPayload.budget = String(updates.budget_per_person);
     }
 
+    // Dynamic column stripping loop: if Supabase complains a column is missing in schema, strip it and retry
+    let currentPayload: Record<string, any> = { ...patchPayload };
     let { data, error } = await supabase
       .from('leads')
-      .update(patchPayload)
+      .update(currentPayload)
       .eq('id', id)
       .select()
       .single();
 
-    // Fallback if schema is missing an optional column (PGRST204)
-    if (error && (error.code === 'PGRST204' || error.message.includes('column'))) {
-      console.warn('Supabase lead patch missing column, retrying with core columns:', error.message);
-      
-      const corePatch: Record<string, any> = {};
-      const allowedCols = [
-        'full_name', 'whatsapp_number', 'email', 'destination', 'preferred_destination',
-        'preferred_date', 'preferred_travel_date', 'date_flexibility', 'pax_count',
-        'departure_city', 'lead_temperature', 'interest_level', 'booking_stage',
-        'lead_source', 'assigned_team_member', 'batch_id', 'budget', 'notes',
-        'next_followup_date', 'next_followup_time', 'next_followup_status',
-        'advance_amount', 'payment_date', 'updated_at'
-      ];
-
-      for (const col of allowedCols) {
-        if (col in patchPayload) {
-          corePatch[col] = patchPayload[col];
-        }
+    let retries = 15;
+    while (error && (error.code === 'PGRST204' || error.message.includes('column')) && retries > 0) {
+      retries--;
+      const match = error.message.match(/Could not find the '([^']+)' column/i);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        console.warn(`Supabase PATCH missing column '${missingCol}', stripping and retrying...`);
+        delete currentPayload[missingCol];
+      } else {
+        delete currentPayload.advance_amount;
+        delete currentPayload.payment_date;
+        delete currentPayload.interest_level;
+        delete currentPayload.next_followup_date;
       }
 
       const retryRes = await supabase
         .from('leads')
-        .update(corePatch)
+        .update(currentPayload)
         .eq('id', id)
         .select()
         .single();
 
-      if (retryRes.data) {
-        data = retryRes.data;
-        error = null;
-      }
+      data = retryRes.data;
+      error = retryRes.error;
     }
 
     if (error) {
