@@ -124,16 +124,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result);
     }
 
+    const storedLeads = getStoredLeads();
+
     // Normalize rows so frontend gets complete Lead object properties
-    const normalizedData = (data || []).map((row: any) => ({
-      ...row,
-      preferred_destination: row.preferred_destination || row.destination || '',
-      preferred_travel_date: row.preferred_travel_date || row.preferred_date || '',
-      number_of_travellers: Number(row.number_of_travellers || row.pax_count) || 1,
-      budget_per_person: Number(row.budget_per_person || row.budget) || null,
-      lead_temperature: row.lead_temperature || row.interest_level || 'new',
-      interest_level: row.interest_level || row.lead_temperature || 'new',
-    }));
+    const normalizedData = (data || []).map((row: any) => {
+      const matchedLocal = storedLeads.find((sl) => sl.id === row.id || (sl.whatsapp_number && sl.whatsapp_number === row.whatsapp_number));
+      return {
+        ...row,
+        preferred_destination: row.preferred_destination || row.destination || matchedLocal?.preferred_destination || '',
+        preferred_travel_date: row.preferred_travel_date || row.preferred_date || matchedLocal?.preferred_travel_date || '',
+        number_of_travellers: Number(row.number_of_travellers || row.pax_count || matchedLocal?.number_of_travellers) || 1,
+        budget_per_person: Number(row.budget_per_person || row.budget || matchedLocal?.budget_per_person) || null,
+        lead_temperature: row.lead_temperature || row.interest_level || matchedLocal?.lead_temperature || 'new',
+        interest_level: row.interest_level || row.lead_temperature || matchedLocal?.interest_level || 'new',
+        advance_amount: row.advance_amount !== undefined && row.advance_amount !== null ? row.advance_amount : (matchedLocal?.advance_amount ?? null),
+        payment_date: row.payment_date || matchedLocal?.payment_date || null,
+        next_followup_date: row.next_followup_date || matchedLocal?.next_followup_date || null,
+        next_followup_time: row.next_followup_time || matchedLocal?.next_followup_time || null,
+        next_followup_status: row.next_followup_status || matchedLocal?.next_followup_status || null,
+      };
+    });
 
     if (normalizedData.length > 0) {
       saveAllStoredLeads(normalizedData);
@@ -153,6 +163,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result);
   }
 }
+
+const SAFE_CORE_COLUMNS = [
+  'id', 'full_name', 'whatsapp_number', 'whatsapp_profile_name', 'email',
+  'departure_city', 'destination', 'preferred_destination', 'preferred_date',
+  'preferred_travel_date', 'date_flexibility', 'lead_source', 'assigned_team_member',
+  'lead_temperature', 'interest_level', 'booking_stage', 'pax_count', 'budget',
+  'notes', 'batch_id', 'created_at', 'updated_at'
+];
 
 export async function POST(request: NextRequest) {
   try {
@@ -187,6 +205,7 @@ export async function POST(request: NextRequest) {
       preferred_contact_method: body.preferred_contact_method || 'whatsapp',
       next_followup_date: body.next_followup_date || null,
       next_followup_time: body.next_followup_time || null,
+      next_followup_status: body.next_followup_date ? 'pending' : null,
       last_contacted_date: nowISO,
       assigned_team_member: body.assigned_team_member || body.assigned_to || null,
       batch_id: body.batch_id || null,
@@ -256,49 +275,48 @@ export async function POST(request: NextRequest) {
           .select()
           .single();
 
-        // If schema missing optional columns (PGRST204 error), strip extra columns and retry
+        // Fallback 1: If optional columns (like advance_amount) are missing in Supabase schema (PGRST204), try with followup columns
         if (error && (error.code === 'PGRST204' || error.message.includes('column'))) {
-          console.warn('Supabase lead schema missing optional column, retrying with core columns:', error.message);
+          console.warn('Supabase lead schema missing optional column, retrying with core + followup columns:', error.message);
           
-          const corePayload: Record<string, any> = {
-            id: targetId,
-            full_name: newLead.full_name,
-            whatsapp_number: newLead.whatsapp_number,
-            email: newLead.email,
-            destination: newLead.preferred_destination,
-            preferred_destination: newLead.preferred_destination,
-            preferred_date: newLead.preferred_travel_date,
-            preferred_travel_date: newLead.preferred_travel_date,
-            date_flexibility: newLead.date_flexibility,
-            pax_count: newLead.number_of_travellers,
-            departure_city: newLead.departure_city,
-            lead_temperature: newLead.lead_temperature,
-            interest_level: newLead.interest_level,
-            booking_stage: newLead.booking_stage,
-            lead_source: newLead.lead_source,
-            assigned_team_member: newLead.assigned_team_member,
-            batch_id: newLead.batch_id,
-            advance_amount: newLead.advance_amount,
-            payment_date: newLead.payment_date,
-            next_followup_date: newLead.next_followup_date,
-            next_followup_time: newLead.next_followup_time,
-            next_followup_status: newLead.next_followup_date ? 'pending' : null,
-            notes: newLead.notes,
-            created_at: newLead.created_at,
-            updated_at: newLead.updated_at,
-          };
+          const followupPayload: Record<string, any> = { ...insertPayload };
+          delete followupPayload.advance_amount;
+          delete followupPayload.payment_date;
 
-          const retryRes = await supabase
+          const retry1 = await supabase
             .from('leads')
-            .upsert([corePayload], { onConflict: 'id' })
+            .upsert([followupPayload], { onConflict: 'id' })
             .select()
             .single();
 
-          if (retryRes.data) {
-            return NextResponse.json({ ...retryRes.data, isDuplicate }, { status: 201 });
+          if (retry1.data) {
+            data = retry1.data;
+            error = null;
+          } else if (retry1.error) {
+            // Fallback 2: Strictly use SAFE_CORE_COLUMNS only
+            console.warn('Retrying insert with pure core columns:', retry1.error.message);
+            const pureCorePayload: Record<string, any> = {};
+            for (const col of SAFE_CORE_COLUMNS) {
+              if (col in insertPayload && insertPayload[col] !== undefined) {
+                pureCorePayload[col] = insertPayload[col];
+              }
+            }
+
+            const retry2 = await supabase
+              .from('leads')
+              .upsert([pureCorePayload], { onConflict: 'id' })
+              .select()
+              .single();
+
+            if (retry2.data) {
+              data = retry2.data;
+              error = null;
+            }
           }
-        } else if (data) {
-          return NextResponse.json({ ...data, isDuplicate }, { status: 201 });
+        }
+
+        if (data) {
+          return NextResponse.json({ ...newLead, ...data, isDuplicate }, { status: 201 });
         }
       } catch (dbErr: any) {
         console.error('Supabase error inserting lead:', dbErr?.message || dbErr);
