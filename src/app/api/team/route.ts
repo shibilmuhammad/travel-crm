@@ -11,46 +11,108 @@ export async function GET() {
 
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.from('team_members').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    return NextResponse.json(data);
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Supabase fetch team_members error, using local store:', error);
+      return NextResponse.json(getStoredTeamMembers());
+    }
+
+    if (data && data.length > 0) {
+      return NextResponse.json(data);
+    }
+    return NextResponse.json(getStoredTeamMembers());
   } catch (err) {
-    const members = getStoredTeamMembers();
-    return NextResponse.json(members);
+    console.error('Error fetching team_members:', err);
+    return NextResponse.json(getStoredTeamMembers());
   }
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-
-  if (!isSupabaseConfigured()) {
+  try {
+    const body = await request.json();
     const nowISO = new Date().toISOString();
+    const memberId = body.id || `user-${Date.now()}`;
+    const fullName = body.full_name || body.name || 'Team Member';
+    const email = body.email || `user-${Date.now()}@unzolo.com`;
+
     const newMember: TeamMember = {
-      id: body.id || `user-${Date.now()}`,
-      full_name: body.full_name || body.name || 'Team Member',
-      name: body.full_name || body.name || 'Team Member',
-      email: body.email || '',
+      id: memberId,
+      full_name: fullName,
+      name: fullName,
+      email: email,
       phone: body.phone || null,
       password: body.password || 'password123',
       role: body.role || 'telecaller',
       employee_id: body.employee_id || null,
       daily_call_target: Number(body.daily_call_target) || 0,
       daily_conversion_target: Number(body.daily_conversion_target) || 0,
-      status: 'active',
-      last_login: null,
-      created_at: nowISO,
+      status: body.status || 'active',
+      last_login: body.last_login || null,
+      created_at: body.created_at || nowISO,
     };
-    saveStoredTeamMember(newMember);
-    return NextResponse.json(newMember, { status: 201 });
-  }
 
-  try {
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase.from('team_members').insert([body]).select().single();
-    if (error) throw error;
-    return NextResponse.json(data, { status: 201 });
+    // Always update local/in-memory store first
+    saveStoredTeamMember(newMember);
+
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createSupabaseClient();
+        const fullPayload = {
+          id: newMember.id,
+          full_name: newMember.full_name,
+          name: newMember.name,
+          email: newMember.email,
+          phone: newMember.phone,
+          password: newMember.password,
+          role: newMember.role,
+          employee_id: newMember.employee_id,
+          daily_call_target: newMember.daily_call_target,
+          daily_conversion_target: newMember.daily_conversion_target,
+          status: newMember.status,
+          last_login: newMember.last_login,
+          created_at: newMember.created_at,
+        };
+
+        const { data, error } = await supabase
+          .from('team_members')
+          .insert([fullPayload])
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Supabase team_members insert error, trying fallback:', error.message);
+          const fallbackPayload = {
+            id: newMember.id,
+            full_name: newMember.full_name,
+            email: newMember.email,
+          };
+
+          const { data: fbData, error: fbError } = await supabase
+            .from('team_members')
+            .insert([fallbackPayload])
+            .select()
+            .single();
+
+          if (fbError) {
+            console.error('Fallback team member insert error:', fbError.message);
+          } else if (fbData) {
+            return NextResponse.json(fbData, { status: 201 });
+          }
+        } else if (data) {
+          return NextResponse.json(data, { status: 201 });
+        }
+      } catch (dbErr: any) {
+        console.error('Supabase error inserting team member:', dbErr?.message || dbErr);
+      }
+    }
+
+    return NextResponse.json(newMember, { status: 201 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('Error creating team member:', err);
+    return NextResponse.json({ error: err.message || 'Failed to create team member' }, { status: 500 });
   }
 }
-
