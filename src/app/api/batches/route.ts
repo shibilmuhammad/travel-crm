@@ -59,13 +59,13 @@ export async function POST(request: NextRequest) {
       notes: body.notes || '',
     };
 
-    // Always update in-memory / local fallback store first
+    // Save locally to in-memory store
     saveStoredBatch(newBatch);
 
     if (isSupabaseConfigured()) {
       try {
         const supabase = createSupabaseClient();
-        const insertPayload = {
+        const fullPayload = {
           id: newBatch.id,
           destination: newBatch.destination,
           proposed_date: newBatch.proposed_date,
@@ -84,37 +84,36 @@ export async function POST(request: NextRequest) {
 
         const { data, error } = await supabase
           .from('trip_batches')
-          .insert([insertPayload])
+          .insert([fullPayload])
           .select()
           .single();
 
         if (error) {
-          console.error('Supabase batch insert error:', error.message, error.details);
-          // Try minimal payload if extra fields caused column mismatch
-          const minPayload = {
+          console.error('Full batch insert error, retriving 3-column fallback payload:', error.message);
+          
+          // Fallback for tables that currently only have (id, destination, proposed_date)
+          const fallbackPayload = {
             id: newBatch.id,
             destination: newBatch.destination,
             proposed_date: newBatch.proposed_date,
-            title: newBatch.title,
-            status: newBatch.status,
-            capacity: newBatch.capacity,
           };
-          const { data: minData, error: minError } = await supabase
+
+          const { data: fbData, error: fbError } = await supabase
             .from('trip_batches')
-            .insert([minPayload])
+            .insert([fallbackPayload])
             .select()
             .single();
 
-          if (minError) {
-            console.error('Supabase min batch insert error:', minError.message);
-          } else if (minData) {
-            return NextResponse.json(minData, { status: 201 });
+          if (fbError) {
+            console.error('Fallback batch insert error:', fbError.message);
+          } else if (fbData) {
+            return NextResponse.json(fbData, { status: 201 });
           }
         } else if (data) {
           return NextResponse.json(data, { status: 201 });
         }
       } catch (dbErr: any) {
-        console.error('Supabase client error on batch insert:', dbErr?.message || dbErr);
+        console.error('Supabase error during batch creation:', dbErr?.message || dbErr);
       }
     }
 
