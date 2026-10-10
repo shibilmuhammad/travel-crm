@@ -111,6 +111,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           apiMembers = data;
         }
       }
+
+      // If Supabase returned 0 team members, automatically seed DEFAULT_ADMIN into Supabase
+      if (apiMembers.length === 0) {
+        try {
+          const syncRes = await fetch('/api/team', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(DEFAULT_ADMIN),
+          });
+          if (syncRes.ok) {
+            const syncedAdmin = await syncRes.json();
+            apiMembers = [syncedAdmin];
+          }
+        } catch (e) {
+          console.error('Error auto-syncing admin account to Supabase:', e);
+        }
+      }
       
       const stored = loadStoredMembers();
       const combinedMap = new Map<string, TeamMember>();
@@ -164,7 +181,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (found.password && password && found.password !== password) {
         return { success: false, error: 'Incorrect password. Please try again.' };
       }
+
       handleSetUser(found);
+
+      // Post to API to make sure user exists in Supabase
+      try {
+        await fetch('/api/team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(found),
+        });
+      } catch (e) {
+        console.error(e);
+      }
+
       return { success: true };
     }
 
@@ -181,18 +211,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    const existing = teamMembers.find((m) => (m.email || '').trim().toLowerCase() === normEmail);
-
-    if (existing) {
-      return { success: false, error: 'An account with this email already exists. Please Sign In instead.' };
-    }
-
-    const newAdmin: TeamMember = {
-      id: `user-${Date.now()}`,
-      full_name: data.full_name,
-      name: data.full_name,
+    const adminMember: TeamMember = {
+      id: 'user-1',
+      full_name: data.full_name || 'Shibil',
+      name: data.full_name || 'Shibil',
       email: normEmail,
-      phone: null,
+      phone: '+918086812602',
       password: data.password || 'password123',
       role: 'admin',
       daily_call_target: 0,
@@ -204,21 +228,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Store custom admin member locally
     const stored = loadStoredMembers();
-    saveStoredMembers([...stored, newAdmin]);
+    saveStoredMembers([adminMember, ...stored.filter((m: TeamMember) => m.email !== normEmail)]);
 
-    const updatedList = [newAdmin, ...teamMembers];
+    const updatedList = [adminMember, ...teamMembers.filter((m: TeamMember) => m.email !== normEmail)];
     setTeamMembers(updatedList);
-    handleSetUser(newAdmin);
+    handleSetUser(adminMember);
 
-    // Try posting to API as well
+    // Sync to backend / Supabase
     try {
       await fetch('/api/team', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAdmin),
+        body: JSON.stringify(adminMember),
       });
     } catch (e) {
-      console.error(e);
+      console.error('Error posting admin to API:', e);
     }
 
     return { success: true };
@@ -227,20 +251,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginGoogle = async () => {
     // Simulated Google OAuth response
     const googleUser = {
-      full_name: 'Google User',
-      email: 'user.google@gmail.com',
+      full_name: 'Shibil',
+      email: 'shibilmuhammad678@gmail.com',
     };
 
     const normEmail = googleUser.email;
     let found = teamMembers.find((m) => (m.email || '').trim().toLowerCase() === normEmail);
 
     if (!found) {
-      const newAdmin: TeamMember = {
-        id: `user-google-${Date.now()}`,
+      found = {
+        id: 'user-1',
         full_name: googleUser.full_name,
         name: googleUser.full_name,
         email: normEmail,
-        phone: null,
+        phone: '+918086812602',
         role: 'admin',
         daily_call_target: 0,
         daily_conversion_target: 0,
@@ -249,12 +273,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         created_at: new Date().toISOString(),
       };
       const stored = loadStoredMembers();
-      saveStoredMembers([...stored, newAdmin]);
-      setTeamMembers([newAdmin, ...teamMembers]);
-      found = newAdmin;
+      saveStoredMembers([...stored, found]);
+      setTeamMembers([found, ...teamMembers]);
     }
 
     handleSetUser(found);
+
+    try {
+      await fetch('/api/team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(found),
+      });
+    } catch (e) {
+      console.error(e);
+    }
+
     return { success: true };
   };
 
@@ -293,4 +327,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export const useAuth = () => useContext(AuthContext);
-
