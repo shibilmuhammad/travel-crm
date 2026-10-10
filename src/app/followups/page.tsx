@@ -20,23 +20,11 @@ import {
   LEAD_TEMPERATURE_LABELS,
   LEAD_TEMPERATURE_COLORS,
 } from '@/types';
-import { formatDate, formatPhoneNumber, getCallLink, getWhatsAppLink } from '@/lib/utils';
+import { formatDate, formatPhoneNumber, getCallLink, getWhatsAppLink, parseToISODate } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
 type TabType = 'today' | 'overdue' | 'upcoming' | 'done';
 type SortField = 'scheduled' | 'booking_stage' | 'lead_status' | 'name' | 'last_contacted';
-
-function parseISODate(val?: string | null): string {
-  if (!val || !val.trim()) return '';
-  const clean = val.trim();
-  if (clean.includes('T')) return clean.split('T')[0];
-  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
-  const d = new Date(clean);
-  if (!isNaN(d.getTime())) {
-    return d.toISOString().split('T')[0];
-  }
-  return clean;
-}
 
 export default function FollowupsPage() {
   const { currentUser, isTelecaller, teamMembers } = useAuth();
@@ -91,7 +79,11 @@ export default function FollowupsPage() {
   const [todayStr, setTodayStr] = useState<string>('');
 
   useEffect(() => {
-    setTodayStr(new Date().toISOString().split('T')[0]);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    setTodayStr(`${y}-${m}-${d}`);
   }, []);
 
   // Telecaller / Staff filter logic
@@ -107,29 +99,27 @@ export default function FollowupsPage() {
   });
 
   // Group leads into tab categories using normalized date strings
-  const todayList = filteredLeadsByStaff.filter((l) => {
+  const todayList = !todayStr ? [] : filteredLeadsByStaff.filter((l) => {
     if (l.next_followup_status === 'completed' || l.booking_stage === 'lost_closed' || l.booking_stage === 'booking_confirmed') {
       return false;
     }
-    const dateStr = parseISODate(l.next_followup_date);
-    // Scheduled for today OR active unassigned leads ready to call today!
-    return dateStr === todayStr || !dateStr;
+    const dateStr = parseToISODate(l.next_followup_date);
+    return Boolean(dateStr && dateStr === todayStr);
   });
 
-  const overdueList = filteredLeadsByStaff.filter((l) => {
+  const overdueList = !todayStr ? [] : filteredLeadsByStaff.filter((l) => {
     if (l.next_followup_status === 'completed' || l.booking_stage === 'lost_closed' || l.booking_stage === 'booking_confirmed') {
       return false;
     }
-    const dateStr = parseISODate(l.next_followup_date);
+    const dateStr = parseToISODate(l.next_followup_date);
     return Boolean(dateStr && dateStr < todayStr);
   });
 
-  const upcomingList = filteredLeadsByStaff.filter((l) => {
+  const upcomingList = !todayStr ? [] : filteredLeadsByStaff.filter((l) => {
     if (l.next_followup_status === 'completed' || l.booking_stage === 'lost_closed' || l.booking_stage === 'booking_confirmed') {
       return false;
     }
-    const dateStr = parseISODate(l.next_followup_date);
-    // Future scheduled dates
+    const dateStr = parseToISODate(l.next_followup_date);
     return Boolean(dateStr && dateStr > todayStr);
   });
 
