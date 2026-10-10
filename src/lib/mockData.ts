@@ -30,22 +30,29 @@ export function getMockLeads(filters: Record<string, string>, leadList?: Lead[])
         (l.batch_id && MOCK_BATCHES.find((b) => b.id === l.batch_id)?.destination.toLowerCase().includes(d))
     );
   }
-  if (filters.interestLevel && filters.interestLevel !== 'all') {
-    leads = leads.filter((l) => l.interest_level === filters.interestLevel);
+  const interest = filters.interest_level || filters.interestLevel;
+  if (interest && interest !== 'all') {
+    leads = leads.filter((l) => l.interest_level === interest || l.lead_temperature === interest);
   }
-  if (filters.lead_temperature && filters.lead_temperature !== 'all') {
-    leads = leads.filter((l) => l.lead_temperature === filters.lead_temperature);
+
+  const temp = filters.lead_temperature || filters.leadTemperature;
+  if (temp && temp !== 'all') {
+    leads = leads.filter((l) => l.lead_temperature === temp || l.interest_level === temp);
   }
-  if (filters.bookingStage && filters.bookingStage !== 'all') {
-    leads = leads.filter((l) => l.booking_stage === filters.bookingStage);
+
+  const stage = filters.booking_stage || filters.bookingStage;
+  if (stage && stage !== 'all') {
+    leads = leads.filter((l) => l.booking_stage === stage);
   }
-  if (filters.batch_id && filters.batch_id !== 'all') {
-    const targetBatch = MOCK_BATCHES.find((b) => b.id === filters.batch_id);
+
+  const batch = filters.batch_id || filters.batchId;
+  if (batch && batch !== 'all') {
+    const targetBatch = MOCK_BATCHES.find((b) => b.id === batch);
     const bTitle = (targetBatch?.title || '').toLowerCase().trim();
     const bDest = (targetBatch?.destination || '').toLowerCase().trim();
 
     leads = leads.filter((l) => {
-      if (l.batch_id === filters.batch_id) return true;
+      if (l.batch_id === batch) return true;
       const leadDest = (l.preferred_destination || '').toLowerCase().trim();
       const leadNotes = (l.notes || '').toLowerCase().trim();
 
@@ -53,15 +60,17 @@ export function getMockLeads(filters: Record<string, string>, leadList?: Lead[])
         (bDest && (leadDest.includes(bDest) || bDest.includes(leadDest))) ||
         (bTitle && (leadDest.includes(bTitle) || bTitle.includes(leadDest) || leadNotes.includes(bTitle)))
       ) {
-        l.batch_id = filters.batch_id;
+        l.batch_id = batch;
         return true;
       }
       return false;
     });
   }
-  if (filters.assigned_team_member && filters.assigned_team_member !== 'all') {
+
+  const assigned = filters.assigned_team_member || filters.assignedTo;
+  if (assigned && assigned !== 'all') {
     leads = leads.filter(
-      (l) => l.assigned_team_member?.toLowerCase() === filters.assigned_team_member?.toLowerCase()
+      (l) => l.assigned_team_member?.toLowerCase().includes(assigned.toLowerCase())
     );
   }
   const prefDateFilter = filters.preferred_date || (filters as any).preferredDate;

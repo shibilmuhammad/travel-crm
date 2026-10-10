@@ -10,20 +10,20 @@ export async function GET(request: NextRequest) {
 
   const search = searchParams.get('search') || '';
   const destination = searchParams.get('destination') || '';
-  const interestLevel = searchParams.get('interest_level') || '';
-  const bookingStage = searchParams.get('booking_stage') || '';
-  const followupDate = searchParams.get('followup_date') || '';
-  const leadSource = searchParams.get('lead_source') || '';
-  const dateFlexibility = searchParams.get('date_flexibility') || '';
-  const preferredDate = searchParams.get('preferred_date') || '';
-  const sortBy = searchParams.get('sort_by') || 'created_at';
-  const sortOrder = searchParams.get('sort_order') || 'desc';
+  const interestLevel = searchParams.get('interest_level') || searchParams.get('interestLevel') || '';
+  const bookingStage = searchParams.get('booking_stage') || searchParams.get('bookingStage') || '';
+  const followupDate = searchParams.get('followup_date') || searchParams.get('followupDate') || '';
+  const leadSource = searchParams.get('lead_source') || searchParams.get('leadSource') || '';
+  const dateFlexibility = searchParams.get('date_flexibility') || searchParams.get('dateFlexibility') || '';
+  const preferredDate = searchParams.get('preferred_date') || searchParams.get('preferredDate') || '';
+  const sortBy = searchParams.get('sort_by') || searchParams.get('sortBy') || 'created_at';
+  const sortOrder = searchParams.get('sort_order') || searchParams.get('sortOrder') || 'desc';
   const page = parseInt(searchParams.get('page') || '1');
-  const pageSize = parseInt(searchParams.get('page_size') || '25');
+  const pageSize = parseInt(searchParams.get('page_size') || searchParams.get('pageSize') || '500');
 
-  const batchId = searchParams.get('batch_id') || '';
-  const assignedTeamMember = searchParams.get('assigned_team_member') || '';
-  const leadTemperature = searchParams.get('lead_temperature') || '';
+  const batchId = searchParams.get('batch_id') || searchParams.get('batchId') || '';
+  const assignedTeamMember = searchParams.get('assigned_team_member') || searchParams.get('assignedTo') || '';
+  const leadTemperature = searchParams.get('lead_temperature') || searchParams.get('leadTemperature') || '';
   const month = searchParams.get('month') || '';
 
   if (!isSupabaseConfigured()) {
@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
       search,
       destination,
       interestLevel,
+      interest_level: interestLevel,
+      bookingStage,
       booking_stage: bookingStage,
       followupDate,
       leadSource,
@@ -57,26 +59,38 @@ export async function GET(request: NextRequest) {
     if (search) {
       query = query.or(`full_name.ilike.%${search}%,whatsapp_number.ilike.%${search}%,whatsapp_profile_name.ilike.%${search}%`);
     }
-    if (destination) {
+    if (destination && destination !== 'all') {
       query = query.or(`preferred_destination.ilike.%${destination}%,destination.ilike.%${destination}%`);
     }
-    if (interestLevel) {
-      query = query.eq('interest_level', interestLevel);
+    if (interestLevel && interestLevel !== 'all') {
+      query = query.or(`interest_level.eq.${interestLevel},lead_temperature.eq.${interestLevel}`);
     }
-    if (bookingStage) {
+    if (leadTemperature && leadTemperature !== 'all') {
+      query = query.or(`lead_temperature.eq.${leadTemperature},interest_level.eq.${leadTemperature}`);
+    }
+    if (bookingStage && bookingStage !== 'all') {
       query = query.eq('booking_stage', bookingStage);
     }
     if (followupDate) {
       query = query.or(`next_followup_date.eq.${followupDate}`);
     }
-    if (leadSource) {
+    if (leadSource && leadSource !== 'all') {
       query = query.eq('lead_source', leadSource);
     }
-    if (dateFlexibility) {
+    if (dateFlexibility && dateFlexibility !== 'all') {
       query = query.eq('date_flexibility', dateFlexibility);
     }
-    if (preferredDate) {
-      query = query.or(`preferred_travel_date.eq.${preferredDate},preferred_date.eq.${preferredDate}`);
+    if (preferredDate && preferredDate !== 'all') {
+      query = query.or(`preferred_travel_date.ilike.%${preferredDate}%,preferred_date.ilike.%${preferredDate}%`);
+    }
+    if (batchId && batchId !== 'all') {
+      query = query.eq('batch_id', batchId);
+    }
+    if (assignedTeamMember && assignedTeamMember !== 'all') {
+      query = query.ilike('assigned_team_member', `%${assignedTeamMember}%`);
+    }
+    if (month && month !== 'all') {
+      query = query.or(`preferred_travel_date.ilike.%${month}%,preferred_date.ilike.%${month}%`);
     }
 
     const validSorts = ['created_at', 'last_contacted_date', 'next_followup_date', 'full_name', 'interest_level'];
@@ -92,11 +106,25 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Supabase fetch leads error, falling back to stored leads:', error);
       const currentLeads = getStoredLeads();
-      const result = getMockLeads({ search, destination, interestLevel, bookingStage, sortBy, sortOrder }, currentLeads);
+      const result = getMockLeads({
+        search,
+        destination,
+        interestLevel,
+        interest_level: interestLevel,
+        bookingStage,
+        booking_stage: bookingStage,
+        batch_id: batchId,
+        assigned_team_member: assignedTeamMember,
+        lead_temperature: leadTemperature,
+        preferred_date: preferredDate,
+        month,
+        sortBy,
+        sortOrder,
+      }, currentLeads);
       return NextResponse.json(result);
     }
 
-    // Map rows to normalize field names across frontend schema and legacy Supabase schema
+    // Normalize rows so frontend gets complete Lead object properties
     const normalizedData = (data || []).map((row: any) => ({
       ...row,
       preferred_destination: row.preferred_destination || row.destination || '',
@@ -107,7 +135,6 @@ export async function GET(request: NextRequest) {
       interest_level: row.interest_level || row.lead_temperature || 'new',
     }));
 
-    // Save fetched items to in-memory store so local cache remains synced
     if (normalizedData.length > 0) {
       saveAllStoredLeads(normalizedData);
     }
@@ -207,7 +234,7 @@ export async function POST(request: NextRequest) {
           .select()
           .single();
 
-        // If schema missing columns (PGRST204 error), strip extra columns and retry!
+        // If schema missing optional columns (PGRST204 error), strip extra columns and retry
         if (error && (error.code === 'PGRST204' || error.message.includes('column'))) {
           console.warn('Supabase lead schema missing optional column, retrying with core columns:', error.message);
           
