@@ -212,7 +212,10 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
       const res = await fetch('/api/leads/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leads: preparedRows }),
+        body: JSON.stringify({
+          clean_reimport: cleanReimport,
+          leads: preparedRows,
+        }),
       });
 
       if (!res.ok) {

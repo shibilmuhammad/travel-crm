@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { Lead } from '@/types';
-import { getStoredLeads, saveAllStoredLeads } from '@/lib/leadStore';
+import { getStoredLeads, saveAllStoredLeads, clearStoredLeads } from '@/lib/leadStore';
+import { clearStoredActivities } from '@/lib/activityStore';
 import { normalizePhoneNumber } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
@@ -13,7 +14,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ count: 0, duplicates: 0, skipped: 0, duplicateLeads: [] });
     }
 
-    const currentLeads = [...getStoredLeads()];
+    const cleanReimport = Boolean(body?.clean_reimport || body?.cleanReimport);
+    if (cleanReimport) {
+      clearStoredLeads();
+      clearStoredActivities();
+    }
+
+    const currentLeads = cleanReimport ? [] : [...getStoredLeads()];
     const phoneMap = new Map<string, Lead>();
     currentLeads.forEach((l) => {
       const p = normalizePhoneNumber(l.whatsapp_number);
@@ -41,6 +48,24 @@ export async function POST(request: NextRequest) {
       const existing = phoneMap.get(normPhone);
       if (existing) {
         duplicateCount++;
+        // Update existing record with any newly provided non-empty fields
+        if (row.advance_amount !== null && row.advance_amount !== undefined) {
+          existing.advance_amount = Number(row.advance_amount);
+        }
+        if (row.payment_date) existing.payment_date = row.payment_date;
+        if (row.booking_stage && row.booking_stage !== 'not_contacted') {
+          existing.booking_stage = row.booking_stage;
+        }
+        if (row.notes) {
+          existing.notes = existing.notes ? `${existing.notes} | ${row.notes}` : row.notes;
+        }
+        if (row.next_followup_date) {
+          existing.next_followup_date = row.next_followup_date;
+          existing.next_followup_time = row.next_followup_time || '10:00 AM';
+          existing.next_followup_status = 'pending';
+        }
+        existing.updated_at = nowISO;
+
         foundDuplicates.push({
           rowNumber,
           uploadedName: row.full_name || row.name || normPhone,
@@ -104,38 +129,38 @@ export async function POST(request: NextRequest) {
       importedCount++;
     }
 
-    if (newLeadsToAppend.length > 0) {
-      const merged = [...newLeadsToAppend, ...currentLeads];
-      saveAllStoredLeads(merged);
+    const merged = cleanReimport
+      ? newLeadsToAppend
+      : [...newLeadsToAppend, ...currentLeads];
+    saveAllStoredLeads(merged);
 
-      if (isSupabaseConfigured()) {
-        try {
-          const supabase = createSupabaseClient();
-          const supabasePayload = newLeadsToAppend.map((l) => ({
-            id: l.id,
-            full_name: l.full_name,
-            whatsapp_number: l.whatsapp_number,
-            destination: l.preferred_destination,
-            preferred_destination: l.preferred_destination,
-            preferred_date: l.preferred_travel_date,
-            preferred_travel_date: l.preferred_travel_date,
-            booking_stage: l.booking_stage,
-            lead_temperature: l.lead_temperature,
-            interest_level: l.interest_level,
-            lead_source: l.lead_source,
-            assigned_team_member: l.assigned_team_member,
-            departure_city: l.departure_city,
-            notes: l.notes,
-            next_followup_date: l.next_followup_date,
-            next_followup_time: l.next_followup_time,
-            next_followup_status: l.next_followup_status,
-            created_at: l.created_at,
-            updated_at: l.updated_at,
-          }));
-          await supabase.from('leads').upsert(supabasePayload, { onConflict: 'id' });
-        } catch (dbErr: any) {
-          console.warn('Supabase bulk upsert error:', dbErr?.message || dbErr);
-        }
+    if (isSupabaseConfigured() && newLeadsToAppend.length > 0) {
+      try {
+        const supabase = createSupabaseClient();
+        const supabasePayload = newLeadsToAppend.map((l) => ({
+          id: l.id,
+          full_name: l.full_name,
+          whatsapp_number: l.whatsapp_number,
+          destination: l.preferred_destination,
+          preferred_destination: l.preferred_destination,
+          preferred_date: l.preferred_travel_date,
+          preferred_travel_date: l.preferred_travel_date,
+          booking_stage: l.booking_stage,
+          lead_temperature: l.lead_temperature,
+          interest_level: l.interest_level,
+          lead_source: l.lead_source,
+          assigned_team_member: l.assigned_team_member,
+          departure_city: l.departure_city,
+          notes: l.notes,
+          next_followup_date: l.next_followup_date,
+          next_followup_time: l.next_followup_time,
+          next_followup_status: l.next_followup_status,
+          created_at: l.created_at,
+          updated_at: l.updated_at,
+        }));
+        await supabase.from('leads').upsert(supabasePayload, { onConflict: 'id' });
+      } catch (dbErr: any) {
+        console.warn('Supabase bulk upsert error:', dbErr?.message || dbErr);
       }
     }
 
