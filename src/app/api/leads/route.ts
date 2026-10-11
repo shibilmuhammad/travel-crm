@@ -296,19 +296,13 @@ export async function POST(request: NextRequest) {
           const match = error.message.match(/Could not find the '([^']+)' column/i);
           if (match && match[1]) {
             const missingCol = match[1];
-            console.warn(`Supabase missing column '${missingCol}', stripping and retrying...`);
+            // Only strip the exact column Supabase reports — never blindly drop followup/payment fields
+            console.warn(`Supabase upsert missing column '${missingCol}', stripping and retrying...`);
             delete currentPayload[missingCol];
           } else {
-            const ABSOLUTE_MINIMAL_COLS = [
-              'id', 'full_name', 'whatsapp_number', 'destination', 'preferred_date',
-              'lead_temperature', 'booking_stage', 'lead_source', 'assigned_team_member',
-              'created_at', 'updated_at'
-            ];
-            const minimalPayload: Record<string, any> = {};
-            for (const c of ABSOLUTE_MINIMAL_COLS) {
-              if (c in currentPayload) minimalPayload[c] = currentPayload[c];
-            }
-            currentPayload = minimalPayload;
+            // Unknown column error — break to avoid stripping next_followup_date or advance_amount
+            console.warn('Supabase upsert column error (unknown column), stopping retry:', error.message);
+            break;
           }
 
           const retryRes = await supabase
@@ -320,6 +314,7 @@ export async function POST(request: NextRequest) {
           data = retryRes.data;
           error = retryRes.error;
         }
+
 
         if (data) {
           return NextResponse.json({ ...newLead, ...data, isDuplicate, existingLead: existingRecord }, { status: 201 });

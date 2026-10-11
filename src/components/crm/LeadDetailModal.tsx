@@ -349,6 +349,8 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
             activity_type: 'follow_up',
             notes: `Follow-up scheduled for ${formatDisplayDateDMY(followupDate)} (${followupTime}): ${followupNote}`,
             next_followup_date: followupDate,
+            next_followup_time: followupTime,
+            next_followup_status: 'pending',
             team_member: followupStaff || 'Shibil Muhammad',
           }),
         });
@@ -383,15 +385,6 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
         >
           <ArrowLeft className="w-4 h-4 text-slate-500" /> Back to Leads
         </button>
-
-        <Button
-          onClick={() => onDelete(currentLead.id)}
-          variant="outline"
-          size="sm"
-          className="border-red-200 text-red-600 hover:bg-red-50 text-xs gap-1.5 bg-white font-semibold shadow-2xs cursor-pointer"
-        >
-          <Trash2 className="w-3.5 h-3.5" /> Delete Lead
-        </Button>
       </div>
 
       {/* Two-Column Detail View Layout */}

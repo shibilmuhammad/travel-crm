@@ -93,6 +93,8 @@ export async function POST(request: NextRequest) {
     }
     if (next_followup_date) {
       leadUpdates.next_followup_date = next_followup_date;
+      if (body.next_followup_time) leadUpdates.next_followup_time = body.next_followup_time;
+      if (body.next_followup_status) leadUpdates.next_followup_status = body.next_followup_status;
     }
 
     updateStoredLead(lead_id, leadUpdates);

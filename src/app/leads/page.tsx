@@ -275,20 +275,13 @@ export default function LeadsPage() {
           onClose={handleCloseLead}
           onUpdate={async (updatedLead) => {
             if (updatedLead) {
+              // Optimistically update viewLead immediately — do NOT re-fetch here
+              // as a second fetch races against the PATCH and can overwrite the
+              // optimistic next_followup_date before it's confirmed by the server.
               setViewLead(updatedLead);
             }
+            // Refresh the leads list in the background (non-blocking)
             fetchLeads();
-            try {
-              const res = await fetch(`/api/leads/${viewLead.id}`);
-              if (res.ok) {
-                const updated = await res.json();
-                if (updated && updated.id) {
-                  setViewLead(updated);
-                }
-              }
-            } catch (e) {
-              console.error(e);
-            }
           }}
           onEdit={(l) => setEditLead(l)}
           onDelete={(id) => handleDelete(id)}

@@ -118,14 +118,26 @@ export default function FollowupsPage() {
     setTodayStr(`${y}-${m}-${d}`);
   }, []);
 
+  const matchesStaff = (assigned?: string | null, filter?: string | null): boolean => {
+    if (!filter || filter === 'all') return true;
+    if (!assigned) return false;
+    const a = assigned.trim().toLowerCase();
+    const f = filter.trim().toLowerCase();
+    if (a === f) return true;
+    if (a.includes(f) || f.includes(a)) return true;
+    const aFirst = a.split(/\s+/)[0];
+    const fFirst = f.split(/\s+/)[0];
+    return Boolean(aFirst && fFirst && aFirst === fFirst);
+  };
+
   // Telecaller / Staff filter logic
   const filteredLeadsByStaff = allLeads.filter((l) => {
     if (isTelecaller) {
-      const myName = (currentUser?.full_name || currentUser?.name || '').toLowerCase();
-      return (l.assigned_team_member || '').toLowerCase() === myName;
+      const myName = currentUser?.full_name || currentUser?.name || '';
+      return matchesStaff(l.assigned_team_member, myName);
     }
     if (selectedStaff !== 'all') {
-      return (l.assigned_team_member || '').toLowerCase() === selectedStaff.toLowerCase();
+      return matchesStaff(l.assigned_team_member, selectedStaff);
     }
     return true;
   });

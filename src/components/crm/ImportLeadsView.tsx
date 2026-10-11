@@ -120,147 +120,107 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
         return;
       }
 
-      let importedCount = 0;
-      let duplicateCount = 0;
-      let skippedCount = 0;
-      const foundDuplicates: DuplicateLeadInfo[] = [];
+      const preparedRows = rows.map((row, idx) => {
+        const rowNumber = idx + 2;
 
-      // Process rows in concurrent batches of 5 for much faster imports
-      const BATCH_SIZE = 5;
-      for (let batchStart = 0; batchStart < rows.length; batchStart += BATCH_SIZE) {
-        const batchRows = rows.slice(batchStart, batchStart + BATCH_SIZE);
-        const batchResults = await Promise.all(
-          batchRows.map(async (row, batchIdx) => {
-            const i = batchStart + batchIdx;
-            const rowNumber = i + 2;
+        const name = String(row['Name'] || row['name'] || row['Full Name'] || '');
+        const phone = String(row['Phone'] || row['phone'] || row['WhatsApp'] || row['whatsapp'] || '');
+        const email = String(row['Email'] || row['email'] || '');
+        const city = String(row['City'] || row['city'] || row['Location'] || '');
+        const leadStatus = String(row['Lead Status'] || row['lead_status'] || row['Status'] || row['status'] || '');
+        const bookingStageStr = String(row['Booking Stage'] || row['booking_stage'] || row['Stage'] || '');
+        const preferredLoc = String(row['Preferred Location'] || row['preferred_location'] || row['Location'] || '');
+        const preferredDate = String(row['Preferred Date'] || row['Prefered date'] || row['preferred_date'] || '');
+        const products = String(row['Product / Batch'] || row['Products'] || row['products'] || row['Batch'] || '');
+        const leadSourceStr = String(row['Lead Source'] || row['lead_source'] || row['Source'] || '');
+        const assignedTo = String(row['Assigned To'] || row['assigned_to'] || row['Assigned'] || '');
+        const callNotes = String(row['Call Notes'] || row['notes'] || row['Notes'] || '');
+        const nextFollowup = String(row['Next Followup Date'] || row['next_followup_date'] || row['Followup Date'] || '');
+        const advanceStr = String(row['Advance Amount'] || row['Advance Paid'] || row['Amount Paid'] || row['advance_amount'] || '');
+        const paymentDateStr = String(row['Payment Date'] || row['Advance Date'] || row['payment_date'] || '');
 
-            const name = String(row['Name'] || row['name'] || row['Full Name'] || '');
-            const phone = String(row['Phone'] || row['phone'] || row['WhatsApp'] || row['whatsapp'] || '');
-            const email = String(row['Email'] || row['email'] || '');
-            const city = String(row['City'] || row['city'] || row['Location'] || '');
-            const leadStatus = String(row['Lead Status'] || row['lead_status'] || row['Status'] || row['status'] || '');
-            const bookingStageStr = String(row['Booking Stage'] || row['booking_stage'] || row['Stage'] || '');
-            const preferredLoc = String(row['Preferred Location'] || row['preferred_location'] || row['Location'] || '');
-            const preferredDate = String(row['Preferred Date'] || row['Prefered date'] || row['preferred_date'] || '');
-            const products = String(row['Product / Batch'] || row['Products'] || row['products'] || row['Batch'] || '');
-            const leadSourceStr = String(row['Lead Source'] || row['lead_source'] || row['Source'] || '');
-            const assignedTo = String(row['Assigned To'] || row['assigned_to'] || row['Assigned'] || '');
-            const callNotes = String(row['Call Notes'] || row['notes'] || row['Notes'] || '');
-            const nextFollowup = String(row['Next Followup Date'] || row['next_followup_date'] || row['Followup Date'] || '');
-            const advanceStr = String(row['Advance Amount'] || row['Advance Paid'] || row['Amount Paid'] || row['advance_amount'] || '');
-            const paymentDateStr = String(row['Payment Date'] || row['Advance Date'] || row['payment_date'] || '');
+        const normalizedPhone = normalizePhoneNumber(phone);
+        const finalName = name.trim() || normalizedPhone;
 
-            const normalizedPhone = normalizePhoneNumber(phone);
-            if (!normalizedPhone || normalizedPhone === '—') {
-              return { type: 'skipped' as const };
-            }
+        const matchedBatch = batches.find((b) => {
+          if (!products && !preferredLoc) return false;
+          const p = products.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+          const loc = preferredLoc.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+          const bTitle = (b.title || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+          const bDest = (b.destination || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
 
-            const finalName = name.trim() || normalizedPhone;
+          if (p && (bTitle.includes(p) || p.includes(bTitle) || bDest.includes(p) || p.includes(bDest))) return true;
 
-            const matchedBatch = batches.find((b) => {
-              if (!products && !preferredLoc) return false;
-              const p = products.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
-              const loc = preferredLoc.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
-              const bTitle = (b.title || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
-              const bDest = (b.destination || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
-
-              if (p && (bTitle.includes(p) || p.includes(bTitle) || bDest.includes(p) || p.includes(bDest))) return true;
-
-              const pWords = p.split(/\s+/).filter((w) => w.length > 0);
-              if (pWords.length > 0) {
-                const isWordMatch = pWords.every((w) => bTitle.includes(w) || bDest.includes(w));
-                if (isWordMatch) return true;
-              }
-
-              if (loc && (bTitle.includes(loc) || loc.includes(bTitle) || bDest.includes(loc) || loc.includes(bDest))) return true;
-
-              return false;
-            });
-
-            const finalDestination = preferredLoc || matchedBatch?.destination || products || 'Vattavada';
-            const finalDateFlexibility = preferredDate.toLowerCase().includes('any future')
-              ? 'any_future_batch'
-              : preferredDate
-              ? 'specific_date_only'
-              : 'not_decided';
-
-            const parsedTemp = parseLeadTemperature(leadStatus);
-            const parsedAdvance = advanceStr ? parseFloat(advanceStr.replace(/[^0-9.]/g, '')) : null;
-            const parsedPaymentDate = parseToISODate(paymentDateStr);
-            const parsedNextFollowup = parseToISODate(nextFollowup);
-
-            const payload = {
-              full_name: finalName,
-              whatsapp_number: normalizedPhone,
-              email: email || null,
-              departure_city: city || null,
-              preferred_destination: finalDestination,
-              batch_id: matchedBatch?.id || batches[0]?.id || '',
-              preferred_travel_date: preferredDate || '',
-              date_flexibility: finalDateFlexibility,
-              lead_source: parseLeadSource(leadSourceStr),
-              assigned_team_member: assignedTo && assignedTo.toLowerCase() !== 'unassigned' ? assignedTo : 'Shibil Muhammad',
-              lead_temperature: parsedTemp,
-              interest_level: parsedTemp,
-              booking_stage: parseBookingStage(bookingStageStr),
-              advance_amount: parsedAdvance,
-              payment_date: parsedPaymentDate || null,
-              notes: callNotes || null,
-              next_followup_date: parsedNextFollowup || null,
-            };
-
-            try {
-              const res = await fetch('/api/leads', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-              });
-
-              if (res.ok) {
-                const resData = await res.json();
-                if (resData.isDuplicate) {
-                  const existing = resData.existingLead || {};
-                  return {
-                    type: 'duplicate' as const,
-                    info: {
-                      rowNumber,
-                      uploadedName: finalName,
-                      phone: normalizedPhone,
-                      existingName: existing.full_name || finalName,
-                      destination: existing.preferred_destination || existing.destination || finalDestination,
-                      bookingStage: existing.booking_stage || payload.booking_stage || 'not_contacted',
-                      advanceAmount: existing.advance_amount !== undefined && existing.advance_amount !== null
-                        ? Number(existing.advance_amount)
-                        : payload.advance_amount,
-                      assignedTo: existing.assigned_team_member || payload.assigned_team_member || 'Shibil Muhammad',
-                    } as DuplicateLeadInfo,
-                  };
-                } else {
-                  return { type: 'imported' as const };
-                }
-              } else {
-                return { type: 'skipped' as const };
-              }
-            } catch {
-              return { type: 'skipped' as const };
-            }
-          })
-        );
-
-        // Tally results from this batch
-        for (const result of batchResults) {
-          if (result.type === 'imported') importedCount++;
-          else if (result.type === 'skipped') skippedCount++;
-          else if (result.type === 'duplicate') {
-            duplicateCount++;
-            foundDuplicates.push(result.info);
+          const pWords = p.split(/\s+/).filter((w) => w.length > 0);
+          if (pWords.length > 0) {
+            const isWordMatch = pWords.every((w) => bTitle.includes(w) || bDest.includes(w));
+            if (isWordMatch) return true;
           }
+
+          if (loc && (bTitle.includes(loc) || loc.includes(bTitle) || bDest.includes(loc) || loc.includes(bDest))) return true;
+
+          return false;
+        });
+
+        const finalDestination = preferredLoc || matchedBatch?.destination || products || 'Vattavada';
+        const finalDateFlexibility = preferredDate.toLowerCase().includes('any future')
+          ? 'any_future_batch'
+          : preferredDate
+          ? 'specific_date_only'
+          : 'not_decided';
+
+        const parsedTemp = parseLeadTemperature(leadStatus);
+        const parsedAdvance = advanceStr ? parseFloat(advanceStr.replace(/[^0-9.]/g, '')) : null;
+        const parsedPaymentDate = parseToISODate(paymentDateStr);
+        const parsedNextFollowup = parseToISODate(nextFollowup);
+
+        let finalAssigned = assignedTo && assignedTo.toLowerCase() !== 'unassigned' ? assignedTo : 'Shibil Muhammad';
+        if (finalAssigned.toLowerCase() === 'shibil') {
+          finalAssigned = 'Shibil Muhammad';
         }
+
+        return {
+          rowNumber,
+          full_name: finalName,
+          whatsapp_number: normalizedPhone,
+          phone: normalizedPhone,
+          email: email || null,
+          departure_city: city || null,
+          preferred_destination: finalDestination,
+          batch_id: matchedBatch?.id || batches[0]?.id || '',
+          preferred_travel_date: preferredDate || '',
+          date_flexibility: finalDateFlexibility,
+          lead_source: parseLeadSource(leadSourceStr),
+          assigned_team_member: finalAssigned,
+          lead_temperature: parsedTemp,
+          interest_level: parsedTemp,
+          booking_stage: parseBookingStage(bookingStageStr),
+          advance_amount: parsedAdvance,
+          payment_date: parsedPaymentDate || null,
+          notes: callNotes || null,
+          next_followup_date: parsedNextFollowup || null,
+          next_followup_time: parsedNextFollowup ? '10:00 AM' : null,
+          next_followup_status: parsedNextFollowup ? 'pending' : null,
+        };
+      });
+
+      const res = await fetch('/api/leads/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads: preparedRows }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Bulk import failed on server');
       }
 
-
-      setDuplicateLeads(foundDuplicates);
-      setImportResult({ count: importedCount, duplicates: duplicateCount, skipped: skippedCount });
+      const resData = await res.json();
+      setDuplicateLeads(resData.duplicateLeads || []);
+      setImportResult({
+        count: resData.count || 0,
+        duplicates: resData.duplicates || 0,
+        skipped: resData.skipped || 0,
+      });
       onSuccess();
     } catch (err: any) {
       alert(err.message || 'Error parsing or uploading file.');
