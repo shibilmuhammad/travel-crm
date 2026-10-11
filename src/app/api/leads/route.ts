@@ -216,7 +216,19 @@ export async function POST(request: NextRequest) {
       notes: body.notes || '',
     };
 
-    // Always update local/in-memory store first
+    let isDuplicate = false;
+    let existingRecord: any = null;
+
+    if (normPhone) {
+      const stored = getStoredLeads();
+      const match = stored.find((l) => normalizePhoneNumber(l.whatsapp_number) === normPhone);
+      if (match) {
+        isDuplicate = true;
+        existingRecord = match;
+      }
+    }
+
+    // Always update local/in-memory store
     saveStoredLead(newLead);
 
     if (isSupabaseConfigured()) {
@@ -224,18 +236,18 @@ export async function POST(request: NextRequest) {
         const supabase = createSupabaseClient();
 
         // Check for duplicate lead by whatsapp_number
-        let targetId = newLead.id;
-        let isDuplicate = false;
+        let targetId = existingRecord?.id || newLead.id;
         if (normPhone) {
           const { data: existing } = await supabase
             .from('leads')
-            .select('id')
+            .select('*')
             .eq('whatsapp_number', normPhone)
             .maybeSingle();
 
           if (existing && existing.id) {
             targetId = existing.id;
             isDuplicate = true;
+            existingRecord = existing;
           }
         }
 
@@ -310,14 +322,14 @@ export async function POST(request: NextRequest) {
         }
 
         if (data) {
-          return NextResponse.json({ ...newLead, ...data, isDuplicate }, { status: 201 });
+          return NextResponse.json({ ...newLead, ...data, isDuplicate, existingLead: existingRecord }, { status: 201 });
         }
       } catch (dbErr: any) {
         console.error('Supabase error inserting lead:', dbErr?.message || dbErr);
       }
     }
 
-    return NextResponse.json(newLead, { status: 201 });
+    return NextResponse.json({ ...newLead, isDuplicate, existingLead: existingRecord }, { status: 201 });
   } catch (err: any) {
     console.error('Failed to create lead:', err);
     return NextResponse.json({ error: err.message || 'Failed to create lead' }, { status: 500 });

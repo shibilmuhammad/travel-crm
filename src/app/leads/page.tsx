@@ -236,7 +236,6 @@ export default function LeadsPage() {
           onClose={() => setShowImport(false)}
           onSuccess={() => {
             fetchLeads();
-            setShowImport(false);
           }}
           batches={batches}
         />
