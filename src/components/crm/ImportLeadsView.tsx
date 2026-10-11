@@ -392,29 +392,50 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
           {/* Detailed Import Results & Actual Duplicates Found Table */}
           {importResult && (
             <div className="space-y-5 pt-6 border-t border-slate-200">
+              {/* Re-import Information Banner */}
+              {importResult.count === 0 && importResult.duplicates > 0 && (
+                <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-950 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold text-blue-900">
+                      All {importResult.duplicates} contacts from this sheet are already in your CRM!
+                    </div>
+                    <p className="text-[11px] text-blue-700 mt-0.5 leading-relaxed">
+                      Your database already contains these contacts. Their records were synchronized and refreshed with the latest data from this file. Click <strong>"View All Leads in CRM"</strong> below to view them in your leads table. (To completely reset and wipe before re-importing, check the <strong>Clean Re-import</strong> box above).
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Summary Badges */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 shadow-2xs">
+                <div className={`p-4 rounded-xl border shadow-2xs ${importResult.count > 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span className="text-[11px] font-semibold text-emerald-800 uppercase tracking-wider">New Leads Created</span>
-                  </div>
-                  <div className="text-2xl font-black text-emerald-950 mt-1">{importResult.count}</div>
-                  <p className="text-[11px] text-emerald-700 mt-0.5">Added as fresh entries</p>
-                </div>
-
-                <div className={`p-4 rounded-xl border shadow-2xs ${importResult.duplicates > 0 ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className={`w-4 h-4 ${importResult.duplicates > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
-                    <span className={`text-[11px] font-semibold uppercase tracking-wider ${importResult.duplicates > 0 ? 'text-amber-900' : 'text-slate-600'}`}>
-                      Duplicates Found & Merged
+                    <CheckCircle2 className={`w-4 h-4 ${importResult.count > 0 ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <span className={`text-[11px] font-semibold uppercase tracking-wider ${importResult.count > 0 ? 'text-emerald-800' : 'text-slate-600'}`}>
+                      New Leads Added
                     </span>
                   </div>
-                  <div className={`text-2xl font-black mt-1 ${importResult.duplicates > 0 ? 'text-amber-950' : 'text-slate-800'}`}>
+                  <div className={`text-2xl font-black mt-1 ${importResult.count > 0 ? 'text-emerald-950' : 'text-slate-800'}`}>
+                    {importResult.count}
+                  </div>
+                  <p className={`text-[11px] mt-0.5 ${importResult.count > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                    {importResult.count > 0 ? 'Added as fresh entries' : 'All contacts already exist in CRM'}
+                  </p>
+                </div>
+
+                <div className={`p-4 rounded-xl border shadow-2xs ${importResult.duplicates > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="flex items-center gap-2">
+                    <UserCheck className={`w-4 h-4 ${importResult.duplicates > 0 ? 'text-blue-600' : 'text-slate-400'}`} />
+                    <span className={`text-[11px] font-semibold uppercase tracking-wider ${importResult.duplicates > 0 ? 'text-blue-900' : 'text-slate-600'}`}>
+                      Existing Contacts Synced
+                    </span>
+                  </div>
+                  <div className={`text-2xl font-black mt-1 ${importResult.duplicates > 0 ? 'text-blue-950' : 'text-slate-800'}`}>
                     {importResult.duplicates}
                   </div>
-                  <p className={`text-[11px] mt-0.5 ${importResult.duplicates > 0 ? 'text-amber-800' : 'text-slate-500'}`}>
-                    Existing contacts synchronized
+                  <p className={`text-[11px] mt-0.5 ${importResult.duplicates > 0 ? 'text-blue-800' : 'text-slate-500'}`}>
+                    Matched & updated in CRM
                   </p>
                 </div>
 
@@ -427,23 +448,23 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
 
               {/* Duplicate Leads Detail Table */}
               {duplicateLeads.length > 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 sm:p-5 space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 font-bold">
-                        !
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-700 font-bold">
+                        i
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-amber-950">
-                          Actual Duplicates Found in Uploaded Sheet ({duplicateLeads.length})
+                        <h3 className="text-sm font-bold text-slate-900">
+                          Matched Existing Contacts in CRM ({duplicateLeads.length})
                         </h3>
-                        <p className="text-[11px] text-amber-900">
-                          These contacts matched existing phone numbers. Their records were updated to avoid double entries:
+                        <p className="text-[11px] text-slate-600">
+                          These contacts match existing records in your CRM database and were synced to prevent double entries:
                         </p>
                       </div>
                     </div>
-                    <span className="text-[11px] font-semibold text-amber-900 bg-amber-200/80 px-2.5 py-1 rounded-md border border-amber-300">
-                      {duplicateLeads.length} Duplicate {duplicateLeads.length === 1 ? 'Contact' : 'Contacts'}
+                    <span className="text-[11px] font-semibold text-blue-900 bg-blue-100 px-2.5 py-1 rounded-md border border-blue-200">
+                      {duplicateLeads.length} Synced {duplicateLeads.length === 1 ? 'Contact' : 'Contacts'}
                     </span>
                   </div>
 
