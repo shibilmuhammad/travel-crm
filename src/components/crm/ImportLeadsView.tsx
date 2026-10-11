@@ -79,6 +79,7 @@ function parseLeadSource(val: string): LeadSource {
 
 export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsViewProps) {
   const [file, setFile] = useState<File | null>(null);
+  const [cleanReimport, setCleanReimport] = useState(false);
   const [loading, setLoading] = useState(false);
   const [importResult, setImportResult] = useState<{ count: number; duplicates: number; skipped: number } | null>(null);
   const [duplicateLeads, setDuplicateLeads] = useState<DuplicateLeadInfo[]>([]);
@@ -102,6 +103,10 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
     setDuplicateLeads([]);
 
     try {
+      if (cleanReimport) {
+        await fetch('/api/leads/delete-all', { method: 'DELETE' });
+      }
+
       let rows: Record<string, any>[] = [];
 
       if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
@@ -235,7 +240,9 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
     try {
       const res = await fetch('/api/leads/delete-all', { method: 'DELETE' });
       if (res.ok) {
-        alert('All existing leads deleted successfully! You can now upload your Excel sheet.');
+        setImportResult(null);
+        setDuplicateLeads([]);
+        alert('All existing leads deleted successfully! The database is now clean (0 leads). You can now upload your Excel sheet.');
         onSuccess();
       } else {
         alert('Failed to delete leads.');
@@ -352,6 +359,21 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
                 onChange={handleFileChange}
                 className="text-xs text-slate-700 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border border-slate-300 file:bg-slate-50 file:text-slate-700 file:font-semibold hover:file:bg-slate-100 cursor-pointer"
               />
+            </div>
+
+            {/* Clean Re-import option */}
+            <div>
+              <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 bg-amber-50/80 hover:bg-amber-100/70 px-3 py-2 rounded-xl border border-amber-200 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={cleanReimport}
+                  onChange={(e) => setCleanReimport(e.target.checked)}
+                  className="rounded border-amber-400 text-blue-900 focus:ring-blue-900 w-4 h-4 cursor-pointer"
+                />
+                <span>
+                  <strong>Clean Re-import:</strong> Clear all existing leads before importing (prevents duplicate matching)
+                </span>
+              </label>
             </div>
 
             <Button

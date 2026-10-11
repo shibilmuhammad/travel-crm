@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { clearStoredLeads } from '@/lib/leadStore';
+import { clearStoredActivities } from '@/lib/activityStore';
 
 export async function DELETE(request: NextRequest) {
   try {
     clearStoredLeads();
+    clearStoredActivities();
 
     if (isSupabaseConfigured()) {
       const supabase = createSupabaseClient();

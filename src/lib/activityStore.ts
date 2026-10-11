@@ -63,3 +63,7 @@ export function saveStoredActivity(activity: LeadActivity): LeadActivity {
   safeWriteActivities(current);
   return activity;
 }
+
+export function clearStoredActivities(): void {
+  safeWriteActivities([]);
+}
