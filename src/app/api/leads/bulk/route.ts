@@ -48,7 +48,10 @@ export async function POST(request: NextRequest) {
       const existing = phoneMap.get(normPhone);
       if (existing) {
         duplicateCount++;
-        // Update existing record with any newly provided non-empty fields
+        if (row.lead_temperature && row.lead_temperature !== 'new') {
+          existing.lead_temperature = row.lead_temperature;
+          existing.interest_level = row.lead_temperature;
+        }
         if (row.advance_amount !== null && row.advance_amount !== undefined) {
           existing.advance_amount = Number(row.advance_amount);
         }
@@ -134,25 +137,30 @@ export async function POST(request: NextRequest) {
       : [...newLeadsToAppend, ...currentLeads];
     saveAllStoredLeads(merged);
 
-    if (isSupabaseConfigured() && newLeadsToAppend.length > 0) {
+    if (isSupabaseConfigured()) {
       try {
-        const supabase = createSupabaseClient();
-        const supabasePayload = newLeadsToAppend.map((l) => ({
-          id: l.id,
-          full_name: l.full_name,
-          whatsapp_number: l.whatsapp_number,
-          destination: l.preferred_destination,
-          preferred_date: l.preferred_travel_date,
-          booking_stage: l.booking_stage,
-          lead_temperature: l.lead_temperature,
-          lead_source: l.lead_source,
-          assigned_team_member: l.assigned_team_member,
-          departure_city: l.departure_city,
-          notes: l.notes,
-          created_at: l.created_at,
-          updated_at: l.updated_at,
-        }));
-        await supabase.from('leads').upsert(supabasePayload, { onConflict: 'id' });
+        const leadsToUpsert = cleanReimport
+          ? merged
+          : [...newLeadsToAppend, ...currentLeads.filter((c) => foundDuplicates.some((d) => d.phone === c.whatsapp_number))];
+        if (leadsToUpsert.length > 0) {
+          const supabase = createSupabaseClient();
+          const supabasePayload = leadsToUpsert.map((l) => ({
+            id: l.id,
+            full_name: l.full_name,
+            whatsapp_number: l.whatsapp_number,
+            destination: l.preferred_destination,
+            preferred_date: l.preferred_travel_date,
+            booking_stage: l.booking_stage,
+            lead_temperature: l.lead_temperature,
+            lead_source: l.lead_source,
+            assigned_team_member: l.assigned_team_member,
+            departure_city: l.departure_city,
+            notes: l.notes,
+            created_at: l.created_at,
+            updated_at: l.updated_at,
+          }));
+          await supabase.from('leads').upsert(supabasePayload, { onConflict: 'id' });
+        }
       } catch (dbErr: any) {
         console.warn('Supabase bulk upsert error:', dbErr?.message || dbErr);
       }
