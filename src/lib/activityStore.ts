@@ -17,16 +17,16 @@ export function getStoredActivities(): LeadActivity[] {
       }
       const content = fs.readFileSync(DATA_PATH, 'utf-8');
       const parsed = JSON.parse(content);
-      IN_MEMORY_ACTIVITIES = Array.isArray(parsed) ? parsed : [...MOCK_ACTIVITIES];
+      IN_MEMORY_ACTIVITIES = Array.isArray(parsed) ? parsed : [];
       LAST_MTIME = stat.mtimeMs;
     } else {
-      IN_MEMORY_ACTIVITIES = [...MOCK_ACTIVITIES];
+      IN_MEMORY_ACTIVITIES = [];
       safeWriteActivities(IN_MEMORY_ACTIVITIES);
     }
   } catch (e) {
-    console.warn('Could not read activities.json, using mock data:', e);
+    console.warn('Could not read activities.json:', e);
     if (!IN_MEMORY_ACTIVITIES) {
-      IN_MEMORY_ACTIVITIES = [...MOCK_ACTIVITIES];
+      IN_MEMORY_ACTIVITIES = [];
     }
   }
 

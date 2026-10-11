@@ -253,11 +253,28 @@ export default function LeadsPage() {
 
   const unassignedCount = leads.filter((l) => !l.assigned_team_member || l.assigned_team_member === 'Unassigned').length;
 
+  const handleCloseImport = () => {
+    setShowImport(false);
+    const emptyFilters: LeadFilters & { month?: string } = {
+      search: '',
+      destination: '',
+      booking_stage: '',
+      preferred_date: '',
+      month: '',
+      lead_temperature: '',
+      lead_source: '',
+      assigned_team_member: '',
+      batch_id: '',
+    };
+    setFilters(emptyFilters);
+    fetchLeads(emptyFilters);
+  };
+
   if (showImport) {
     return (
       <DashboardLayout>
         <ImportLeadsView
-          onClose={() => setShowImport(false)}
+          onClose={handleCloseImport}
           onSuccess={() => {
             fetchLeads();
           }}

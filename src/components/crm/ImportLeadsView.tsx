@@ -514,7 +514,10 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
                 </Button>
 
                 <Button
-                  onClick={onClose}
+                  onClick={() => {
+                    onSuccess();
+                    onClose();
+                  }}
                   className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-5 py-2.5 shadow-sm gap-2 cursor-pointer"
                 >
                   View All Leads in CRM <ArrowRight className="w-4 h-4" />

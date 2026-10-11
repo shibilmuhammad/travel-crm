@@ -29,17 +29,17 @@ export function getStoredLeads(): Lead[] {
       }
       const content = fs.readFileSync(DATA_PATH, 'utf-8');
       const parsed = JSON.parse(content);
-      const list = Array.isArray(parsed) ? parsed : [...MOCK_LEADS];
+      const list = Array.isArray(parsed) ? parsed : [];
       IN_MEMORY_LEADS = list.map(normalizeLead);
       LAST_MTIME = stat.mtimeMs;
     } else {
-      IN_MEMORY_LEADS = [...MOCK_LEADS].map(normalizeLead);
+      IN_MEMORY_LEADS = [];
       safeWriteLeads(IN_MEMORY_LEADS);
     }
   } catch (e) {
-    console.warn('Could not read leads.json, using mock data:', e);
+    console.warn('Could not read leads.json:', e);
     if (!IN_MEMORY_LEADS) {
-      IN_MEMORY_LEADS = [...MOCK_LEADS].map(normalizeLead);
+      IN_MEMORY_LEADS = [];
     }
   }
 

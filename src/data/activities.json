@@ -1,17 +1,1 @@
-[
-  {
-    "id": "act-1791697052604-tr96d",
-    "lead_id": "lead-1791696928148-troao",
-    "activity_type": "follow_up",
-    "activity_date": "2026-10-11T05:37:32.604Z",
-    "created_at": "2026-10-11T05:37:32.604Z",
-    "notes": "Follow-up scheduled for 2026-10-15 (11:00 AM): told she will confirm today",
-    "outcome": null,
-    "next_action": null,
-    "updated_interest_level": null,
-    "updated_booking_stage": null,
-    "updated_preferred_date": null,
-    "next_followup_date": "2026-10-15",
-    "team_member": "Shibil Muhammad"
-  }
-]
+[]
