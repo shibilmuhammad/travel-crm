@@ -22,8 +22,8 @@ interface AuthContextType {
 
 const DEFAULT_ADMIN: TeamMember = MOCK_TEAM_MEMBERS[0] || {
   id: 'user-1',
-  full_name: 'Shibil',
-  name: 'Shibil',
+  full_name: 'Shibil Muhammad',
+  name: 'Shibil Muhammad',
   email: 'shibilmuhammad678@gmail.com',
   phone: '+918086812602',
   role: 'admin',

@@ -207,7 +207,9 @@ export async function POST(request: NextRequest) {
       next_followup_time: body.next_followup_time || null,
       next_followup_status: body.next_followup_date ? 'pending' : null,
       last_contacted_date: nowISO,
-      assigned_team_member: body.assigned_team_member || body.assigned_to || null,
+      assigned_team_member: (!body.assigned_team_member || body.assigned_team_member === 'Unassigned' || body.assigned_team_member.toLowerCase() === 'shibil')
+        ? 'Shibil Muhammad'
+        : body.assigned_team_member,
       batch_id: body.batch_id || null,
       ad_campaign: body.ad_campaign || null,
       ad_id: body.ad_id || null,

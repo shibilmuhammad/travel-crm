@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   X, ArrowLeft, Phone, MessageSquare, Mail, Edit, Trash2, Calendar, Clock,
   UserCheck, Save, PhoneCall, CheckCircle2, Shield
@@ -21,9 +21,56 @@ import { CompleteFollowupModal } from '@/components/crm/CompleteFollowupModal';
 interface LeadDetailModalProps {
   lead: Lead | null;
   onClose: () => void;
-  onUpdate: () => void;
+  onUpdate: (updatedLead?: Lead) => void;
   onEdit: (lead: Lead) => void;
   onDelete: (id: string) => void;
+}
+
+const TIME_OPTIONS = [
+  '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM',
+  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
+  '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
+  '08:00 PM', '08:30 PM', '09:00 PM', '09:30 PM', '10:00 PM'
+];
+
+function getDateISO(daysAhead = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isoToDMY(isoDateStr?: string | null): string {
+  if (!isoDateStr) return '';
+  const clean = isoDateStr.trim().split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return clean;
+}
+
+function dmyToISO(dmyStr?: string | null): string {
+  if (!dmyStr) return '';
+  const parts = dmyStr.trim().split(/[/.-]/);
+  if (parts.length === 3) {
+    let [d, m, y] = parts;
+    if (d.length === 4 && y.length <= 2) {
+      [y, m, d] = [d, m, y];
+    }
+    if (y.length === 2) {
+      y = `20${y}`;
+    }
+    return `${y.padStart(4, '20')}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return dmyStr;
+}
+
+function formatDisplayDateDMY(isoDateStr?: string | null): string {
+  return isoToDMY(isoDateStr);
 }
 
 export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: LeadDetailModalProps) {
@@ -47,13 +94,30 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
   const [callNote, setCallNote] = useState('');
 
   // Assignment State
-  const [assignedStaff, setAssignedStaff] = useState('');
+  const [assignedStaff, setAssignedStaff] = useState('Shibil Muhammad');
 
   // Follow-up Schedule State
+  const datePickerRef = useRef<HTMLInputElement>(null);
   const [followupDate, setFollowupDate] = useState('');
+  const [followupDisplayDate, setFollowupDisplayDate] = useState('');
   const [followupTime, setFollowupTime] = useState('10:00 AM');
-  const [followupStaff, setFollowupStaff] = useState('');
+  const [followupStaff, setFollowupStaff] = useState('Shibil Muhammad');
   const [followupNote, setFollowupNote] = useState('');
+
+  // Normalize staff options so Admin (Shibil Muhammad) is always present and clean
+  const staffOptions = [
+    { id: 'admin-shibil', name: 'Shibil Muhammad', role: 'admin' },
+    ...teamMembers
+      .filter((m) => {
+        const n = (m.full_name || m.name || '').trim();
+        return n !== 'Shibil' && n !== 'Shibil Muhammad' && n !== '';
+      })
+      .map((m) => ({
+        id: m.id,
+        name: m.full_name || m.name || 'Staff',
+        role: m.role || 'telecaller',
+      })),
+  ];
 
   useEffect(() => {
     setWeekendOptions(generateUpcomingWeekends(3));
@@ -61,9 +125,18 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
 
   useEffect(() => {
     if (lead) {
-      setCurrentLead(lead);
+      setCurrentLead((prev) => {
+        if (!prev || prev.id !== lead.id) return lead;
+        return {
+          ...lead,
+          ...prev,
+          next_followup_date: prev.next_followup_date || lead.next_followup_date,
+          next_followup_time: prev.next_followup_time || lead.next_followup_time,
+          next_followup_status: prev.next_followup_status || lead.next_followup_status,
+        };
+      });
     }
-  }, [lead]);
+  }, [lead?.id]);
 
   useEffect(() => {
     if (currentLead) {
@@ -80,11 +153,26 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
       const isMatch = weekendOptions.some((w) => w.value === pDate);
       setIsCustomDate(!!pDate && !isMatch);
 
-      setAssignedStaff(currentLead.assigned_team_member || 'Unassigned');
-      setFollowupStaff(currentLead.assigned_team_member || 'Unassigned');
+      const staffVal = (currentLead.assigned_team_member && currentLead.assigned_team_member !== 'Unassigned' && currentLead.assigned_team_member !== 'Shibil')
+        ? currentLead.assigned_team_member
+        : 'Shibil Muhammad';
+
+      setAssignedStaff(staffVal);
+      setFollowupStaff(staffVal);
+
+      // Pre-fill schedule follow-up if present on currentLead
+      if (currentLead.next_followup_date) {
+        const iso = parseToISODate(currentLead.next_followup_date) || currentLead.next_followup_date;
+        setFollowupDate(iso);
+        setFollowupDisplayDate(isoToDMY(iso));
+        if (currentLead.next_followup_time) {
+          setFollowupTime(currentLead.next_followup_time);
+        }
+      }
+
       fetchActivities(currentLead.id);
     }
-  }, [currentLead, weekendOptions]);
+  }, [currentLead?.id, weekendOptions]);
 
   const fetchActivities = async (leadId: string) => {
     try {
@@ -106,13 +194,13 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
         const updated = await res.json();
         if (updated && updated.id) {
           setCurrentLead(updated);
+          onUpdate(updated);
         }
       }
     } catch (e) {
       console.error(e);
     }
     fetchActivities(currentLead.id);
-    onUpdate();
   };
 
   if (!currentLead) return null;
@@ -139,10 +227,17 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
       });
       if (res.ok) {
         const updated = await res.json();
-        if (updated && updated.id) {
-          setCurrentLead(updated);
-        }
-        onUpdate();
+        const finalLead = (updated && updated.id) ? updated : {
+          ...currentLead,
+          lead_temperature: tempStatus as LeadTemperature,
+          booking_stage: tempBookingStage as BookingStage,
+          preferred_destination: tempDestination,
+          preferred_travel_date: tempTravelDate,
+          advance_amount: tempAdvanceAmount ? parseFloat(tempAdvanceAmount) : null,
+          payment_date: tempPaymentDate || null,
+        };
+        setCurrentLead(finalLead);
+        onUpdate(finalLead);
         alert('Lead status & details updated successfully!');
       } else {
         alert('Failed to update status.');
@@ -175,7 +270,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
       if (res.ok) {
         setCallNote('');
         fetchActivities(currentLead.id);
-        onUpdate();
+        onUpdate(currentLead);
         alert('Call log saved!');
       }
     } catch (e) {
@@ -197,10 +292,12 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
       });
       if (res.ok) {
         const updated = await res.json();
-        if (updated && updated.id) {
-          setCurrentLead(updated);
-        }
-        onUpdate();
+        const finalLead = (updated && updated.id) ? updated : {
+          ...currentLead,
+          assigned_team_member: assignedStaff,
+        };
+        setCurrentLead(finalLead);
+        onUpdate(finalLead);
         alert(`Lead reassigned to ${assignedStaff}`);
       }
     } catch (e) {
@@ -210,7 +307,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
     }
   };
 
-  // Schedule Follow-up
+  // Schedule Follow-up with Instant UI update
   const handleScheduleFollowup = async () => {
     if (!currentLead) return;
     if (!followupDate) {
@@ -218,6 +315,19 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
       return;
     }
     setLoading(true);
+
+    const scheduledLead: Lead = {
+      ...currentLead,
+      next_followup_date: followupDate,
+      next_followup_time: followupTime,
+      next_followup_status: 'pending',
+      assigned_team_member: followupStaff || 'Shibil Muhammad',
+    };
+
+    // INSTANT UI REFLECTION: update local state and parent state immediately so user sees the card right away!
+    setCurrentLead(scheduledLead);
+    onUpdate(scheduledLead);
+
     try {
       const res = await fetch(`/api/leads/${currentLead.id}`, {
         method: 'PATCH',
@@ -226,7 +336,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           next_followup_date: followupDate,
           next_followup_time: followupTime,
           next_followup_status: 'pending',
-          assigned_team_member: followupStaff,
+          assigned_team_member: followupStaff || 'Shibil Muhammad',
         }),
       });
 
@@ -237,23 +347,21 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           body: JSON.stringify({
             lead_id: currentLead.id,
             activity_type: 'follow_up',
-            notes: `Follow-up scheduled for ${followupDate} (${followupTime}): ${followupNote}`,
+            notes: `Follow-up scheduled for ${formatDisplayDateDMY(followupDate)} (${followupTime}): ${followupNote}`,
             next_followup_date: followupDate,
-            team_member: followupStaff,
+            team_member: followupStaff || 'Shibil Muhammad',
           }),
         });
       }
 
       if (res.ok) {
         const updated = await res.json();
-        if (updated && updated.id) {
-          setCurrentLead(updated);
-        }
+        const finalLead = (updated && updated.id) ? updated : scheduledLead;
+        setCurrentLead(finalLead);
         fetchActivities(currentLead.id);
-        onUpdate();
-        alert('Follow-up scheduled successfully!');
+        onUpdate(finalLead);
       } else {
-        alert('Failed to schedule follow-up');
+        alert('Failed to save follow-up to database');
       }
     } catch (e) {
       console.error(e);
@@ -267,7 +375,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
 
   return (
     <div className="space-y-6">
-      {/* Top Header matching Reference Image 2 */}
+      {/* Top Header */}
       <div className="flex items-center justify-between">
         <button
           onClick={onClose}
@@ -280,13 +388,13 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           onClick={() => onDelete(currentLead.id)}
           variant="outline"
           size="sm"
-          className="border-red-200 text-red-600 hover:bg-red-50 text-xs gap-1.5 bg-white font-semibold shadow-2xs"
+          className="border-red-200 text-red-600 hover:bg-red-50 text-xs gap-1.5 bg-white font-semibold shadow-2xs cursor-pointer"
         >
           <Trash2 className="w-3.5 h-3.5" /> Delete Lead
         </Button>
       </div>
 
-      {/* Two-Column Detail View Layout matching Reference Images 2 & 3 */}
+      {/* Two-Column Detail View Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* LEFT COLUMN (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
@@ -306,7 +414,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
                   onClick={() => onEdit(currentLead)}
                   variant="outline"
                   size="sm"
-                  className="border-slate-300 text-slate-700 text-xs hover:bg-slate-100 gap-1.5"
+                  className="border-slate-300 text-slate-700 text-xs hover:bg-slate-100 gap-1.5 cursor-pointer"
                 >
                   <Edit className="w-3 h-3" /> Edit
                 </Button>
@@ -348,7 +456,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
               </div>
               <div>
                 <div className="font-bold text-slate-900">Assigned To:</div>
-                <div className="text-slate-600 mt-0.5 font-semibold">{currentLead.assigned_team_member || 'Unassigned'}</div>
+                <div className="text-slate-600 mt-0.5 font-semibold text-blue-950">{currentLead.assigned_team_member || 'Shibil Muhammad'}</div>
               </div>
               <div>
                 <div className="font-bold text-slate-900">Created:</div>
@@ -516,7 +624,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
               onClick={handleSaveStatus}
               disabled={loading}
               size="sm"
-              className="bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold shadow text-xs gap-1.5"
+              className="bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold shadow text-xs gap-1.5 cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" /> Save Status & Info
             </Button>
@@ -546,7 +654,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
               onClick={handleLogCall}
               disabled={loading || !callNote.trim()}
               size="sm"
-              className="bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold shadow text-xs gap-1.5"
+              className="bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold shadow text-xs gap-1.5 cursor-pointer"
             >
               <PhoneCall className="w-3.5 h-3.5" /> Log Call
             </Button>
@@ -586,9 +694,9 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
                   <SelectValue placeholder="Select Staff" />
                 </SelectTrigger>
                 <SelectContent className="bg-white text-slate-900">
-                  {teamMembers.map((m) => (
-                    <SelectItem key={m.id} value={m.full_name || m.name || 'Staff'}>
-                      {m.full_name || m.name} ({m.role.toUpperCase()})
+                  {staffOptions.map((m) => (
+                    <SelectItem key={m.id} value={m.name}>
+                      {m.name} {m.role === 'admin' ? '(ADMIN)' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -599,35 +707,144 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
               onClick={handleUpdateAssignment}
               disabled={loading}
               size="sm"
-              className="w-full bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold shadow text-xs gap-1.5"
+              className="w-full bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold shadow text-xs gap-1.5 cursor-pointer"
             >
               <UserCheck className="w-3.5 h-3.5" /> Update Assignment
             </Button>
           </Card>
 
-          {/* Card 2: Schedule Follow-up */}
+          {/* Card 2: Schedule Follow-up with Time dropdown and DD/MM/YYYY formatting */}
           <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
             <h3 className="text-sm font-bold text-slate-900">Schedule Follow-up</h3>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Date Input with DD/MM/YYYY formatting */}
               <div>
-                <Label className="text-xs font-bold text-slate-700">Date</Label>
-                <Input
-                  type="date"
-                  value={followupDate}
-                  onChange={(e) => setFollowupDate(e.target.value)}
-                  className="mt-1 bg-white border-slate-300 text-slate-900 text-xs"
-                />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-slate-500" /> Date
+                  </Label>
+                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1 rounded border border-slate-200">
+                    dd/mm/yyyy
+                  </span>
+                </div>
+
+                <div className="relative mt-1">
+                  <Input
+                    type="text"
+                    placeholder="dd/mm/yyyy"
+                    value={followupDisplayDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFollowupDisplayDate(val);
+                      const parsed = dmyToISO(val);
+                      if (/^\d{4}-\d{2}-\d{2}$/.test(parsed)) {
+                        setFollowupDate(parsed);
+                      }
+                    }}
+                    onClick={() => {
+                      try {
+                        datePickerRef.current?.showPicker();
+                      } catch {
+                        datePickerRef.current?.focus();
+                      }
+                    }}
+                    className="bg-white border-slate-300 text-slate-900 text-xs pr-8 font-medium cursor-pointer"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        datePickerRef.current?.showPicker();
+                      } catch {
+                        datePickerRef.current?.focus();
+                      }
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                    title="Open calendar"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  </button>
+                  <input
+                    ref={datePickerRef}
+                    type="date"
+                    value={followupDate}
+                    onChange={(e) => {
+                      const iso = e.target.value;
+                      setFollowupDate(iso);
+                      setFollowupDisplayDate(isoToDMY(iso));
+                    }}
+                    className="sr-only"
+                    tabIndex={-1}
+                  />
+                </div>
+
+                {/* Quick Date Chips */}
+                <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const iso = getDateISO(0);
+                      setFollowupDate(iso);
+                      setFollowupDisplayDate(isoToDMY(iso));
+                    }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold border border-slate-200 cursor-pointer"
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const iso = getDateISO(1);
+                      setFollowupDate(iso);
+                      setFollowupDisplayDate(isoToDMY(iso));
+                    }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold border border-slate-200 cursor-pointer"
+                  >
+                    Tomorrow
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const iso = getDateISO(2);
+                      setFollowupDate(iso);
+                      setFollowupDisplayDate(isoToDMY(iso));
+                    }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold border border-slate-200 cursor-pointer"
+                  >
+                    +2 Days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const iso = getDateISO(7);
+                      setFollowupDate(iso);
+                      setFollowupDisplayDate(isoToDMY(iso));
+                    }}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold border border-slate-200 cursor-pointer"
+                  >
+                    +1 Week
+                  </button>
+                </div>
               </div>
+
+              {/* Time Dropdown Selector */}
               <div>
-                <Label className="text-xs font-bold text-slate-700">Time</Label>
-                <Input
-                  type="text"
-                  placeholder="10:00 AM"
-                  value={followupTime}
-                  onChange={(e) => setFollowupTime(e.target.value)}
-                  className="mt-1 bg-white border-slate-300 text-slate-900 text-xs"
-                />
+                <Label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" /> Time
+                </Label>
+                <Select value={followupTime} onValueChange={setFollowupTime}>
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 text-slate-900 text-xs">
+                    <SelectValue placeholder="10:00 AM" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white text-slate-900 max-h-60 overflow-y-auto">
+                    {TIME_OPTIONS.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -638,9 +855,9 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
                   <SelectValue placeholder="Select Staff" />
                 </SelectTrigger>
                 <SelectContent className="bg-white text-slate-900">
-                  {teamMembers.map((m) => (
-                    <SelectItem key={m.id} value={m.full_name || m.name || 'Staff'}>
-                      {m.full_name || m.name}
+                  {staffOptions.map((m) => (
+                    <SelectItem key={m.id} value={m.name}>
+                      {m.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -661,24 +878,27 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
               onClick={handleScheduleFollowup}
               disabled={loading}
               size="sm"
-              className="w-full bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold shadow text-xs gap-1.5"
+              className="w-full bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold shadow text-xs gap-1.5 cursor-pointer"
             >
               <Calendar className="w-3.5 h-3.5" /> Schedule
             </Button>
           </Card>
 
-          {/* Card 3: Follow-ups Card matching Input Image 1 */}
+          {/* Card 3: Follow-ups Card matching Reference Image 3 */}
           <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
             <h3 className="text-base font-bold text-slate-900">Follow-ups</h3>
             {currentLead.next_followup_date ? (
               <div className="space-y-3 pt-1">
                 <div className="flex items-start justify-between">
                   <div>
-                    <div className="text-sm font-extrabold text-slate-900">
-                      {formatDate(currentLead.next_followup_date)}, {currentLead.next_followup_time || '10:00 AM'}
+                    <div className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                      <span>{formatDate(currentLead.next_followup_date)}, {currentLead.next_followup_time || '10:00 AM'}</span>
+                      <span className="text-[11px] text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                        {formatDisplayDateDMY(currentLead.next_followup_date)}
+                      </span>
                     </div>
-                    <div className="text-xs font-semibold text-slate-500 mt-0.5">
-                      {currentLead.assigned_team_member || 'Unassigned Staff'}
+                    <div className="text-xs font-semibold text-slate-500 mt-1">
+                      {currentLead.assigned_team_member || 'Shibil Muhammad'}
                     </div>
                   </div>
                   {currentLead.next_followup_status === 'completed' ? (
@@ -727,4 +947,5 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
     </div>
   );
 }
+
 

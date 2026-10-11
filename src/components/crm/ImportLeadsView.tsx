@@ -157,7 +157,7 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
           preferred_travel_date: preferredDate || '',
           date_flexibility: finalDateFlexibility,
           lead_source: parseLeadSource(leadSourceStr),
-          assigned_team_member: assignedTo || 'Unassigned',
+          assigned_team_member: assignedTo && assignedTo.toLowerCase() !== 'unassigned' ? assignedTo : 'Shibil Muhammad',
           lead_temperature: parsedTemp,
           interest_level: parsedTemp,
           booking_stage: parseBookingStage(bookingStageStr),

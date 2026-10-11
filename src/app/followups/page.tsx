@@ -203,13 +203,18 @@ export default function FollowupsPage() {
         <LeadDetailModal
           lead={viewLead}
           onClose={() => setViewLead(null)}
-          onUpdate={async () => {
+          onUpdate={async (updatedLead) => {
+            if (updatedLead) {
+              setViewLead(updatedLead);
+            }
             fetchFollowups();
             try {
               const res = await fetch(`/api/leads/${viewLead.id}`);
               if (res.ok) {
                 const updated = await res.json();
-                setViewLead(updated);
+                if (updated && updated.id) {
+                  setViewLead(updated);
+                }
               }
             } catch (e) {
               console.error(e);
