@@ -22,7 +22,7 @@ export async function POST() {
       return NextResponse.json({ success: true, count: 0, message: 'No stored leads to sync.' });
     }
 
-    const payload = storedLeads.map((l) => ({
+    const fullPayload = storedLeads.map((l) => ({
       id: l.id,
       full_name: l.full_name,
       whatsapp_number: l.whatsapp_number,
@@ -44,15 +44,39 @@ export async function POST() {
       updated_at: l.updated_at,
     }));
 
-    const { error } = await supabase.from('leads').upsert(payload, { onConflict: 'id' });
+    let { error } = await supabase.from('leads').upsert(fullPayload, { onConflict: 'id' });
+
+    // If schema cache lacks advance_amount, fall back to base columns
+    if (error && String(error.message).includes('column')) {
+      const basePayload = storedLeads.map((l) => ({
+        id: l.id,
+        full_name: l.full_name,
+        whatsapp_number: l.whatsapp_number,
+        email: l.email || null,
+        destination: l.preferred_destination,
+        preferred_date: l.preferred_travel_date,
+        date_flexibility: l.date_flexibility,
+        departure_city: l.departure_city,
+        lead_temperature: l.lead_temperature,
+        booking_stage: l.booking_stage,
+        lead_source: l.lead_source,
+        assigned_team_member: l.assigned_team_member,
+        notes: l.notes,
+        created_at: l.created_at,
+        updated_at: l.updated_at,
+      }));
+      const fallbackResult = await supabase.from('leads').upsert(basePayload, { onConflict: 'id' });
+      error = fallbackResult.error;
+    }
+
     if (error) {
       throw error;
     }
 
     return NextResponse.json({
       success: true,
-      count: payload.length,
-      message: `Successfully synced ${payload.length} leads into Supabase public.leads table!`,
+      count: storedLeads.length,
+      message: `Successfully synced ${storedLeads.length} leads into Supabase public.leads table!`,
     });
   } catch (err: any) {
     console.error('Error syncing leads to Supabase:', err);
