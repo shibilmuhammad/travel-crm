@@ -169,6 +169,7 @@ export async function POST(request: NextRequest) {
             next_followup_time: l.next_followup_time,
             next_followup_status: l.next_followup_status,
             notes: l.notes,
+            batch_id: l.batch_id,
             created_at: l.created_at,
             updated_at: l.updated_at,
           }));
@@ -185,6 +186,7 @@ export async function POST(request: NextRequest) {
               lead_source: l.lead_source,
               assigned_team_member: l.assigned_team_member,
               departure_city: l.departure_city,
+              batch_id: l.batch_id,
               notes: l.notes,
               created_at: l.created_at,
               updated_at: l.updated_at,

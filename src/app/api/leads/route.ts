@@ -142,6 +142,7 @@ export async function GET(request: NextRequest) {
         payment_date: row.payment_date || matchedLocal?.payment_date || null,
         next_followup_date: row.next_followup_date || matchedLocal?.next_followup_date || null,
         next_followup_time: row.next_followup_time || matchedLocal?.next_followup_time || null,
+        batch_id: row.batch_id || matchedLocal?.batch_id || (row.destination?.toLowerCase().includes('vattavada') || row.preferred_destination?.toLowerCase().includes('vattavada') ? 'batch-1791614057252' : null),
         next_followup_status: row.next_followup_status || matchedLocal?.next_followup_status || null,
       };
     });

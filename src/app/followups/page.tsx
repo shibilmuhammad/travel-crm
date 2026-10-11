@@ -271,9 +271,15 @@ export default function FollowupsPage() {
             lead={editLead}
             open={!!editLead}
             onClose={() => setEditLead(null)}
-            onSuccess={() => {
-              fetchFollowups();
+            onSuccess={(updated) => {
+              if (updated) {
+                setViewLead(updated);
+                setAllLeads((prev) =>
+                  prev.map((l) => (l.id === updated.id ? updated : l))
+                );
+              }
               setEditLead(null);
+              fetchFollowups();
             }}
           />
         )}

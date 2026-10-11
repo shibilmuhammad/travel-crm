@@ -342,7 +342,11 @@ export default function LeadsPage() {
             lead={editLead}
             open={!!editLead}
             onClose={() => setEditLead(null)}
-            onSuccess={() => {
+            onSuccess={(updated) => {
+              if (updated) {
+                setViewLead(updated);
+              }
+              setEditLead(null);
               fetchLeads();
             }}
           />
@@ -769,6 +773,7 @@ export default function LeadsPage() {
           open={!!editLead}
           onClose={() => setEditLead(null)}
           onSuccess={() => {
+            setEditLead(null);
             fetchLeads();
           }}
         />

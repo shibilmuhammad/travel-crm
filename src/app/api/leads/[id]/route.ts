@@ -30,6 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       budget_per_person: Number(data.budget_per_person || data.budget) || null,
       lead_temperature: data.lead_temperature || data.interest_level || 'new',
       interest_level: data.interest_level || data.lead_temperature || 'new',
+      batch_id: data.batch_id || (data.destination?.toLowerCase().includes('vattavada') || data.preferred_destination?.toLowerCase().includes('vattavada') ? 'batch-1791614057252' : null),
     };
 
     return NextResponse.json(normalized);
@@ -145,6 +146,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       budget_per_person: Number(data.budget_per_person || data.budget) || null,
       lead_temperature: data.lead_temperature || data.interest_level || 'new',
       interest_level: data.interest_level || data.lead_temperature || 'new',
+      batch_id: data.batch_id || updates.batch_id || (data.destination?.toLowerCase().includes('vattavada') || data.preferred_destination?.toLowerCase().includes('vattavada') ? 'batch-1791614057252' : null),
     };
 
     return NextResponse.json(normalized);

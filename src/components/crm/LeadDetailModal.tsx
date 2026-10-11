@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import type { Lead, LeadActivity, LeadTemperature, BookingStage } from '@/types';
+import type { Lead, LeadActivity, LeadTemperature, BookingStage, TripBatch } from '@/types';
 import { BOOKING_STAGE_LABELS, LEAD_TEMPERATURE_LABELS } from '@/types';
 import { formatDate, formatDateTime, formatPhoneNumber, parseToISODate, getWhatsAppLink, getCallLink, generateUpcomingWeekends, WeekendOption } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -81,9 +81,12 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
 
   // Status & Travel Info State
+  const [batches, setBatches] = useState<TripBatch[]>([]);
   const [tempStatus, setTempStatus] = useState<string>('');
   const [tempBookingStage, setTempBookingStage] = useState<string>('');
   const [tempDestination, setTempDestination] = useState<string>('');
+  const [tempCity, setTempCity] = useState<string>('');
+  const [tempBatchId, setTempBatchId] = useState<string>('');
   const [tempTravelDate, setTempTravelDate] = useState<string>('');
   const [tempAdvanceAmount, setTempAdvanceAmount] = useState<string>('');
   const [tempPaymentDate, setTempPaymentDate] = useState<string>('');
@@ -123,28 +126,27 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
 
   useEffect(() => {
     setWeekendOptions(generateUpcomingWeekends(3));
+    fetch('/api/batches')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setBatches(data);
+      })
+      .catch((err) => console.error(err));
   }, []);
 
   useEffect(() => {
     if (lead) {
-      setCurrentLead((prev) => {
-        if (!prev || prev.id !== lead.id) return lead;
-        return {
-          ...lead,
-          ...prev,
-          next_followup_date: prev.next_followup_date || lead.next_followup_date,
-          next_followup_time: prev.next_followup_time || lead.next_followup_time,
-          next_followup_status: prev.next_followup_status || lead.next_followup_status,
-        };
-      });
+      setCurrentLead(lead);
     }
-  }, [lead?.id]);
+  }, [lead]);
 
   useEffect(() => {
     if (currentLead) {
       setTempStatus(currentLead.lead_temperature || currentLead.interest_level || 'new');
       setTempBookingStage(currentLead.booking_stage || 'not_contacted');
       setTempDestination(currentLead.preferred_destination || currentLead.destination || '');
+      setTempCity(currentLead.departure_city || '');
+      setTempBatchId(currentLead.batch_id || '');
       setTempAdvanceAmount(currentLead.advance_amount ? String(currentLead.advance_amount) : '');
       const isoPayDate = parseToISODate(currentLead.payment_date) || new Date().toISOString().split('T')[0];
       setTempPaymentDate(isoPayDate);
@@ -174,7 +176,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
 
       fetchActivities(currentLead.id);
     }
-  }, [currentLead?.id, weekendOptions]);
+  }, [currentLead, weekendOptions]);
 
   const fetchActivities = async (leadId: string) => {
     try {
@@ -221,6 +223,8 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           booking_stage: tempBookingStage,
           preferred_destination: tempDestination,
           destination: tempDestination,
+          departure_city: tempCity,
+          batch_id: tempBatchId,
           preferred_travel_date: tempTravelDate,
           preferred_date: tempTravelDate,
           advance_amount: tempAdvanceAmount ? parseFloat(tempAdvanceAmount) : null,
@@ -234,6 +238,9 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           lead_temperature: tempStatus as LeadTemperature,
           booking_stage: tempBookingStage as BookingStage,
           preferred_destination: tempDestination,
+          destination: tempDestination,
+          departure_city: tempCity,
+          batch_id: tempBatchId,
           preferred_travel_date: tempTravelDate,
           advance_amount: tempAdvanceAmount ? parseFloat(tempAdvanceAmount) : null,
           payment_date: tempPaymentDate || null,
@@ -491,10 +498,16 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
             </div>
 
             {/* Grid attributes */}
-            <div className="grid grid-cols-3 gap-4 text-xs mt-4 pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs mt-4 pt-4 border-t border-slate-100">
               <div>
-                <div className="font-bold text-slate-900">City:</div>
-                <div className="text-slate-600 mt-0.5">{currentLead.departure_city || 'Eranakulam'}</div>
+                <div className="font-bold text-slate-900">City / Origin:</div>
+                <div className="text-slate-600 mt-0.5">{currentLead.departure_city || '—'}</div>
+              </div>
+              <div>
+                <div className="font-bold text-slate-900">Product / Batch:</div>
+                <div className="text-blue-900 font-semibold mt-0.5">
+                  {batches.find((b) => b.id === currentLead.batch_id)?.title || (currentLead.batch_id ? 'Vattavada Camp 1' : '—')}
+                </div>
               </div>
               <div>
                 <div className="font-bold text-slate-900">Source:</div>
@@ -605,9 +618,38 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
               </div>
             )}
 
+            {/* Product / Batch & Departure City */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Product / Trip Batch</Label>
+                <Select value={tempBatchId} onValueChange={setTempBatchId}>
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 text-slate-900 text-xs">
+                    <SelectValue placeholder="-- Select Batch --" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white text-slate-900">
+                    {batches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.title || b.destination}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-slate-700">Departure City (Origin)</Label>
+                <Input
+                  placeholder="e.g. Kalamassery / Kochi"
+                  value={tempCity}
+                  onChange={(e) => setTempCity(e.target.value)}
+                  className="mt-1 bg-white border-slate-300 text-slate-900 text-xs"
+                />
+              </div>
+            </div>
+
             {/* Preferred Location */}
             <div>
-              <Label className="text-xs font-bold text-slate-700">Preferred Location</Label>
+              <Label className="text-xs font-bold text-slate-700">Preferred Location (Destination)</Label>
               <div className="space-y-1.5 mt-1">
                 <Input
                   placeholder="e.g. Vattavada, Wayanad, Spiti Valley..."
