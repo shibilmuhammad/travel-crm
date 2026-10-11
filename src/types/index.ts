@@ -119,6 +119,7 @@ export interface TripBatch {
   capacity: number | null;
   total_capacity?: number | null;
   confirmed_pax?: number;
+  confirmed_seats?: number;
   minimum_viable_size: number | null;
   departure_city: string | null;
   notes: string | null;

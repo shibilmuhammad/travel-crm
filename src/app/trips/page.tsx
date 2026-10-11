@@ -40,7 +40,7 @@ export default function TripsPage() {
   const fetchBatches = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/batches');
+      const res = await fetch('/api/batches', { cache: 'no-store' });
       const data = await res.json();
       setBatches(Array.isArray(data) ? data : []);
     } catch (err) {
