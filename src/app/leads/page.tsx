@@ -104,11 +104,81 @@ export default function LeadsPage() {
     fetchLeads(filters);
   };
 
+  const handleViewLead = (lead: Lead) => {
+    setViewLead(lead);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ viewLeadId: lead.id }, '', `/leads?id=${lead.id}`);
+    }
+  };
+
+  const handleCloseLead = () => {
+    setViewLead(null);
+    if (typeof window !== 'undefined' && window.location.search.includes('id=')) {
+      window.history.pushState(null, '', '/leads');
+    }
+  };
+
+  // Browser Back button navigation listener - brings user back to all leads table
+  useEffect(() => {
+    const handlePopState = () => {
+      setViewLead(null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Listen to Leads tab click from Sidebar to clear all filters and reset to all leads
+  useEffect(() => {
+    const handleReset = () => {
+      setViewLead(null);
+      setEditLead(null);
+      setShowAddLead(false);
+      setShowImport(false);
+      const empty: LeadFilters & { month?: string } = {
+        search: '',
+        destination: '',
+        booking_stage: '',
+        preferred_date: '',
+        month: '',
+        lead_temperature: '',
+        lead_source: '',
+        assigned_team_member: '',
+        batch_id: '',
+      };
+      setFilters(empty);
+      if (typeof window !== 'undefined' && window.location.search) {
+        window.history.pushState(null, '', '/leads');
+      }
+      fetchLeads(empty);
+    };
+
+    window.addEventListener('unzolo:reset-leads', handleReset);
+    return () => window.removeEventListener('unzolo:reset-leads', handleReset);
+  }, [fetchLeads]);
+
+  // Read URL query id on mount if present
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const leadId = params.get('id');
+      if (leadId) {
+        fetch(`/api/leads/${leadId}`)
+          .then((res) => res.json())
+          .then((lead) => {
+            if (lead && lead.id) setViewLead(lead);
+          })
+          .catch((err) => console.error(err));
+      }
+    }
+  }, []);
+
   const handleDeleteLead = async (id: string) => {
     if (!confirm('Are you sure you want to delete this lead?')) return;
     try {
       const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
       if (res.ok) {
+        if (viewLead?.id === id) handleCloseLead();
         await fetchLeads();
       }
     } catch (e) {
@@ -129,6 +199,9 @@ export default function LeadsPage() {
       batch_id: '',
     };
     setFilters(empty);
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.pushState(null, '', '/leads');
+    }
     fetchLeads(empty);
   };
 
@@ -150,7 +223,7 @@ export default function LeadsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this lead? This action cannot be undone.')) return;
     await fetch(`/api/leads/${id}`, { method: 'DELETE' });
-    if (viewLead?.id === id) setViewLead(null);
+    if (viewLead?.id === id) handleCloseLead();
     fetchLeads();
   };
 
@@ -176,7 +249,7 @@ export default function LeadsPage() {
       <DashboardLayout>
         <LeadDetailModal
           lead={viewLead}
-          onClose={() => setViewLead(null)}
+          onClose={handleCloseLead}
           onUpdate={async (updatedLead) => {
             if (updatedLead) {
               setViewLead(updatedLead);
@@ -532,7 +605,7 @@ export default function LeadsPage() {
                         <td className="px-4 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <Button
-                              onClick={() => setViewLead(lead)}
+                              onClick={() => handleViewLead(lead)}
                               variant="outline"
                               size="sm"
                               className="border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-medium gap-1.5"

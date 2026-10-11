@@ -72,12 +72,35 @@ export default function FollowupsPage() {
     fetchFollowups();
   }, [fetchFollowups]);
 
+  const handleViewLead = (lead: Lead) => {
+    setViewLead(lead);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ viewLeadId: lead.id }, '', `/followups?id=${lead.id}`);
+    }
+  };
+
+  const handleCloseLead = () => {
+    setViewLead(null);
+    if (typeof window !== 'undefined' && window.location.search.includes('id=')) {
+      window.history.pushState(null, '', '/followups');
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setViewLead(null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleDeleteLead = async (id: string) => {
     if (!confirm('Are you sure you want to delete this lead?')) return;
     try {
       const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        setViewLead(null);
+        if (viewLead?.id === id) handleCloseLead();
         fetchFollowups();
       }
     } catch (e) {
@@ -214,7 +237,7 @@ export default function FollowupsPage() {
       <DashboardLayout>
         <LeadDetailModal
           lead={viewLead}
-          onClose={() => setViewLead(null)}
+          onClose={handleCloseLead}
           onUpdate={async (updatedLead) => {
             if (updatedLead) {
               setViewLead(updatedLead);
@@ -636,7 +659,7 @@ export default function FollowupsPage() {
                             </a>
 
                             <Button
-                              onClick={() => setViewLead(lead)}
+                              onClick={() => handleViewLead(lead)}
                               variant="outline"
                               size="sm"
                               className="bg-white border-slate-300 text-slate-800 hover:bg-slate-100 text-xs font-bold px-3 py-1 rounded-lg gap-1.5 cursor-pointer shadow-2xs"

@@ -70,6 +70,13 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => {
+                if (item.href === '/leads') {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('unzolo:reset-leads'));
+                  }
+                }
+              }}
               className={cn(
                 'flex items-center gap-3.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all',
                 isActive
