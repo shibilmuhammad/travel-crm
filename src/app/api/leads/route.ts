@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getMockLeads } from '@/lib/mockData';
 import { Lead } from '@/types';
-import { getStoredLeads, saveStoredLead, saveAllStoredLeads } from '@/lib/leadStore';
+import { getStoredLeads, saveStoredLead, saveAllStoredLeads, deleteStoredLeads } from '@/lib/leadStore';
+import { deleteStoredActivitiesByLeadIds } from '@/lib/activityStore';
 import { normalizePhoneNumber } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
@@ -328,5 +329,43 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     console.error('Failed to create lead:', err);
     return NextResponse.json({ error: err.message || 'Failed to create lead' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const ids: string[] = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
+
+    if (!ids || ids.length === 0) {
+      return NextResponse.json({ error: 'No lead IDs provided for deletion' }, { status: 400 });
+    }
+
+    // 1. Delete from local storage
+    deleteStoredLeads(ids);
+    deleteStoredActivitiesByLeadIds(ids);
+
+    // 2. Delete from Supabase if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createSupabaseClient();
+        // Delete all related activities/follow-ups first
+        await supabase.from('lead_activities').delete().in('lead_id', ids);
+        // Delete the lead records
+        const { error } = await supabase.from('leads').delete().in('id', ids);
+        if (error) console.error('Supabase bulk delete leads error:', error.message);
+      } catch (sbErr: any) {
+        console.warn('Supabase bulk delete error:', sbErr?.message || sbErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      count: ids.length,
+      message: `Successfully deleted ${ids.length} lead(s) and all related follow-ups/data.`,
+    });
+  } catch (err: any) {
+    console.error('Error during bulk delete leads:', err);
+    return NextResponse.json({ error: err.message || 'Failed to bulk delete leads' }, { status: 500 });
   }
 }

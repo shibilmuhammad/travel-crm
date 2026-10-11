@@ -411,6 +411,20 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
                 >
                   <Edit className="w-3 h-3" /> Edit
                 </Button>
+                {onDelete && (
+                  <Button
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete ${currentLead.full_name}? All follow-ups and data related to this lead will be permanently deleted.`)) {
+                        onDelete(currentLead.id);
+                      }
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="border-red-200 text-red-600 text-xs hover:bg-red-50 hover:border-red-300 gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" /> Delete Lead
+                  </Button>
+                )}
               </div>
             </div>
 

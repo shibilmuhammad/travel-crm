@@ -40,6 +40,8 @@ export default function LeadsPage() {
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [showAddLead, setShowAddLead] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [deletingBulk, setDeletingBulk] = useState(false);
 
   const [filters, setFilters] = useState<LeadFilters & { month?: string }>({
     search: '',
@@ -198,15 +200,46 @@ export default function LeadsPage() {
   }, []);
 
   const handleDeleteLead = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this lead?')) return;
     try {
       const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
       if (res.ok) {
         if (viewLead?.id === id) handleCloseLead();
+        setSelectedLeadIds((prev) => prev.filter((itemId) => itemId !== id));
         await fetchLeads();
       }
     } catch (e) {
       console.error('Failed to delete lead:', e);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLeadIds.length === 0) return;
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedLeadIds.length} selected lead(s)? All their follow-ups, call notes, and related data will be permanently deleted.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingBulk(true);
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedLeadIds }),
+      });
+      if (res.ok) {
+        setSelectedLeadIds([]);
+        await fetchLeads();
+      } else {
+        alert('Failed to delete selected leads.');
+      }
+    } catch (e) {
+      console.error('Error during bulk deletion:', e);
+      alert('Error during bulk deletion.');
+    } finally {
+      setDeletingBulk(false);
     }
   };
 
@@ -532,11 +565,54 @@ export default function LeadsPage() {
             </div>
           </div>
 
+          {/* Bulk Selection Action Bar */}
+          {selectedLeadIds.length > 0 && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-blue-950">
+                  {selectedLeadIds.length} of {leads.length} lead{selectedLeadIds.length > 1 ? 's' : ''} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLeadIds([])}
+                  className="text-xs text-blue-700 hover:text-blue-900 underline font-medium cursor-pointer"
+                >
+                  Deselect all
+                </button>
+              </div>
+              <Button
+                type="button"
+                onClick={handleBulkDelete}
+                disabled={deletingBulk}
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {deletingBulk ? 'Deleting…' : `Delete Selected (${selectedLeadIds.length})`}
+              </Button>
+            </div>
+          )}
+
           {/* Leads Table matching Reference Image 1 */}
           <div className="overflow-x-auto border border-slate-100 rounded-lg">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-500 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
                 <tr>
+                  <th className="px-3 py-3.5 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all leads"
+                      checked={leads.length > 0 && selectedLeadIds.length === leads.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedLeadIds(leads.map((l) => l.id));
+                        } else {
+                          setSelectedLeadIds([]);
+                        }
+                      }}
+                      className="rounded border-slate-300 text-blue-900 focus:ring-blue-900 cursor-pointer w-4 h-4"
+                    />
+                  </th>
                   <th className="px-4 py-3.5">LEAD ID</th>
                   <th className="px-4 py-3.5">NAME</th>
                   <th className="px-4 py-3.5">PHONE</th>
@@ -551,13 +627,13 @@ export default function LeadsPage() {
               <tbody className="divide-y divide-slate-100 text-slate-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-500 text-sm">
+                    <td colSpan={10} className="py-12 text-center text-slate-500 text-sm">
                       Loading leads…
                     </td>
                   </tr>
                 ) : leads.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-500 text-sm">
+                    <td colSpan={10} className="py-12 text-center text-slate-500 text-sm">
                       No leads found. Click <strong>+ Add Lead</strong> above to create one.
                     </td>
                   </tr>
@@ -568,7 +644,27 @@ export default function LeadsPage() {
                     const stageKey: BookingStage = lead.booking_stage || 'not_contacted';
 
                     return (
-                      <tr key={lead.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr
+                        key={lead.id}
+                        className={`hover:bg-slate-50/80 transition-colors ${
+                          selectedLeadIds.includes(lead.id) ? 'bg-blue-50/40' : ''
+                        }`}
+                      >
+                        <td className="px-3 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select lead ${lead.full_name}`}
+                            checked={selectedLeadIds.includes(lead.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLeadIds((prev) => [...prev, lead.id]);
+                              } else {
+                                setSelectedLeadIds((prev) => prev.filter((id) => id !== lead.id));
+                              }
+                            }}
+                            className="rounded border-slate-300 text-blue-900 focus:ring-blue-900 cursor-pointer w-4 h-4"
+                          />
+                        </td>
                         <td className="px-4 py-4 font-mono font-bold text-blue-900">
                           {leadCode}
                         </td>

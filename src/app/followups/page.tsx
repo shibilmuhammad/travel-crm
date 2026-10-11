@@ -96,15 +96,15 @@ export default function FollowupsPage() {
   }, []);
 
   const handleDeleteLead = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this lead?')) return;
     try {
       const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' });
       if (res.ok) {
         if (viewLead?.id === id) handleCloseLead();
+        setAllLeads((prev) => prev.filter((l) => l.id !== id));
         fetchFollowups();
       }
     } catch (e) {
-      console.error(e);
+      console.error('Error deleting lead from followups:', e);
     }
   };
 

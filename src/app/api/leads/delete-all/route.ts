@@ -10,8 +10,13 @@ export async function DELETE(request: NextRequest) {
 
     if (isSupabaseConfigured()) {
       const supabase = createSupabaseClient();
+      try {
+        await supabase.from('lead_activities').delete().neq('id', '');
+      } catch (actErr: any) {
+        console.warn('Supabase delete lead_activities error:', actErr?.message || actErr);
+      }
       const { error } = await supabase.from('leads').delete().neq('id', '');
-      if (error) console.error('Supabase delete all error:', error.message);
+      if (error) console.error('Supabase delete all leads error:', error.message);
     }
 
     return NextResponse.json({ success: true, message: 'All leads deleted' });

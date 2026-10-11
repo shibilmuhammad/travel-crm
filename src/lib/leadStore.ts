@@ -112,7 +112,16 @@ export function updateStoredLead(id: string, updates: Partial<Lead>): Lead | nul
 }
 
 export function deleteStoredLead(id: string): boolean {
+  if (!id) return true;
   let current = getStoredLeads().filter((l) => l.id !== id);
+  safeWriteLeads(current);
+  return true;
+}
+
+export function deleteStoredLeads(ids: string[]): boolean {
+  if (!ids || ids.length === 0) return true;
+  const idSet = new Set(ids);
+  let current = getStoredLeads().filter((l) => !idSet.has(l.id));
   safeWriteLeads(current);
   return true;
 }

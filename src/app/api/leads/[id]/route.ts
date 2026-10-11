@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getStoredLeads, updateStoredLead, deleteStoredLead } from '@/lib/leadStore';
+import { deleteStoredActivitiesByLeadId } from '@/lib/activityStore';
 import { normalizePhoneNumber } from '@/lib/utils';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -156,18 +157,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   deleteStoredLead(id);
+  deleteStoredActivitiesByLeadId(id);
 
   if (!isSupabaseConfigured()) {
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'Lead and related data deleted' });
   }
 
   try {
     const supabase = createSupabaseClient();
+    // Delete all related activities/follow-ups first
+    await supabase.from('lead_activities').delete().eq('lead_id', id);
+    // Delete the lead record
     const { error } = await supabase.from('leads').delete().eq('id', id);
     if (error) console.error('Supabase delete lead error:', error.message);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'Lead and related data deleted' });
   } catch (err: any) {
-    console.error('Error deleting lead:', err);
-    return NextResponse.json({ success: true });
+    console.error('Error deleting lead and related data:', err);
+    return NextResponse.json({ success: true, message: 'Lead deleted from local store' });
   }
 }

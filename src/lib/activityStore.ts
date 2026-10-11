@@ -67,3 +67,18 @@ export function saveStoredActivity(activity: LeadActivity): LeadActivity {
 export function clearStoredActivities(): void {
   safeWriteActivities([]);
 }
+
+export function deleteStoredActivitiesByLeadId(leadId: string): void {
+  if (!leadId) return;
+  const current = getStoredActivities();
+  const filtered = current.filter((a) => a.lead_id !== leadId);
+  safeWriteActivities(filtered);
+}
+
+export function deleteStoredActivitiesByLeadIds(leadIds: string[]): void {
+  if (!leadIds || leadIds.length === 0) return;
+  const idSet = new Set(leadIds);
+  const current = getStoredActivities();
+  const filtered = current.filter((a) => !idSet.has(a.lead_id));
+  safeWriteActivities(filtered);
+}
