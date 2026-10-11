@@ -157,7 +157,7 @@ export default function LeadsPage() {
     return () => window.removeEventListener('unzolo:reset-leads', handleReset);
   }, [fetchLeads]);
 
-  // Read URL query id on mount if present
+  // Read URL query parameters on mount if present
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -169,6 +169,30 @@ export default function LeadsPage() {
             if (lead && lead.id) setViewLead(lead);
           })
           .catch((err) => console.error(err));
+      }
+
+      const qSearch = params.get('search');
+      const qDest = params.get('destination');
+      const qStage = params.get('booking_stage');
+      const qTemp = params.get('lead_temperature');
+      const qSource = params.get('lead_source');
+      const qStaff = params.get('assigned_team_member');
+      const qDate = params.get('preferred_date');
+
+      if (qSearch || qDest || qStage || qTemp || qSource || qStaff || qDate) {
+        const urlFilters: LeadFilters & { month?: string } = {
+          search: qSearch || '',
+          destination: qDest || '',
+          booking_stage: (qStage as any) || '',
+          preferred_date: qDate || '',
+          month: '',
+          lead_temperature: (qTemp as any) || '',
+          lead_source: (qSource as any) || '',
+          assigned_team_member: qStaff || '',
+          batch_id: '',
+        };
+        setFilters(urlFilters);
+        fetchLeads(urlFilters);
       }
     }
   }, []);

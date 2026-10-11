@@ -61,6 +61,7 @@ export interface Lead {
   whatsapp_number: string;
   email?: string | null;
   whatsapp_profile_name?: string | null;
+  city?: string | null; // Customer city / location of residence
   preferred_destination?: string | null;
   destination?: string | null;
   preferred_travel_date?: string | null; // ISO date string
@@ -85,6 +86,7 @@ export interface Lead {
   ad_campaign?: string | null;
   ad_id?: string | null;
   notes?: string | null;
+  lost_reason?: string | null;
   created_at: string;
   updated_at?: string;
 }
@@ -178,20 +180,38 @@ export interface DemandGroup {
 export interface DashboardStats {
   total_leads: number;
   new_enquiries: number;
+  new_leads: number;
+  hot_leads: number;
   followups_due_today: number;
+  overdue_followups: number;
   high_intent_leads: number;
   leads_no_future_date: number;
   confirmed_bookings: number;
+  conversion_rate: number;
   total_advance_collected: number;
-  overdue_followups: number;
-  conversion_rate?: number;
+  bookings_with_advance: number;
   ready_to_book_count?: number;
+  // Prior period comparisons
+  prev_total_leads?: number;
+  prev_confirmed_bookings?: number;
+  prev_conversion_rate?: number;
+  prev_advance_collected?: number;
 }
 
 export interface TodayPriority {
-  type: 'call_due' | 'overdue_followup' | 'high_intent_no_booking' | 'awaiting_confirmation';
+  type:
+    | 'call_due'
+    | 'overdue_followup'
+    | 'hot_no_followup'
+    | 'high_intent_no_booking'
+    | 'waiting_for_date'
+    | 'waiting_for_price'
+    | 'not_contacted'
+    | 'unassigned'
+    | 'awaiting_confirmation';
   lead: Lead;
   note?: string;
+  urgency?: 'urgent' | 'high' | 'medium' | 'normal';
 }
 
 // ─── Filter / Sort Types ──────────────────────────────────────────────────────
