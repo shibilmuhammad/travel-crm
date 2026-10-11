@@ -1,1 +1,17 @@
-[]
+[
+  {
+    "id": "act-1791717599445-4y2ts",
+    "lead_id": "lead-1791715643996-0-35rn",
+    "activity_type": "phone_call",
+    "activity_date": "2026-10-11T11:19:59.445Z",
+    "created_at": "2026-10-11T11:19:59.445Z",
+    "notes": "hello\n",
+    "outcome": "Call Logged",
+    "next_action": null,
+    "updated_interest_level": null,
+    "updated_booking_stage": null,
+    "updated_preferred_date": null,
+    "next_followup_date": null,
+    "team_member": "Shibil Muhammad"
+  }
+]
