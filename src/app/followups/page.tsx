@@ -26,6 +26,15 @@ import { useAuth } from '@/context/AuthContext';
 type TabType = 'today' | 'overdue' | 'upcoming' | 'done';
 type SortField = 'scheduled' | 'booking_stage' | 'lead_status' | 'name' | 'last_contacted';
 
+const getLeadStatusPriority = (lead: Lead): number => {
+  const status = (lead.lead_temperature || lead.interest_level || '').toLowerCase().trim();
+  if (status === 'hot' || status === 'high_intent') return 1;
+  if (status === 'warm' || status === 'interested') return 2;
+  if (status === 'cold' || status === 'low_interest') return 3;
+  if (status === 'not_interested' || status === 'not interested') return 4;
+  return 5;
+};
+
 export default function FollowupsPage() {
   const { currentUser, isTelecaller, teamMembers } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('today');
@@ -165,9 +174,12 @@ export default function FollowupsPage() {
       const stageB = BOOKING_STAGE_LABELS[b.booking_stage || 'not_contacted'] || '';
       comp = stageA.localeCompare(stageB);
     } else if (sortBy === 'lead_status') {
-      const statusA = LEAD_TEMPERATURE_LABELS[a.lead_temperature || 'new'] || '';
-      const statusB = LEAD_TEMPERATURE_LABELS[b.lead_temperature || 'new'] || '';
-      comp = statusA.localeCompare(statusB);
+      const priorityA = getLeadStatusPriority(a);
+      const priorityB = getLeadStatusPriority(b);
+      comp = priorityA - priorityB;
+      if (comp === 0) {
+        comp = (a.full_name || '').localeCompare(b.full_name || '');
+      }
     } else if (sortBy === 'name') {
       comp = (a.full_name || '').localeCompare(b.full_name || '');
     } else if (sortBy === 'last_contacted') {
