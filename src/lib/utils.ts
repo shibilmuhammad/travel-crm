@@ -17,12 +17,46 @@ export function parseToISODate(dateStr: string | null | undefined): string {
     return trimmed;
   }
 
-  // DD/MM/YYYY or DD-MM-YYYY format
-  const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmyMatch) {
-    const day = dmyMatch[1].padStart(2, '0');
-    const month = dmyMatch[2].padStart(2, '0');
-    const year = dmyMatch[3];
+  // Handle Excel serial date numbers (e.g. 46307)
+  if (/^\d{5}$/.test(trimmed)) {
+    const serial = parseInt(trimmed, 10);
+    const dateObj = new Date(Math.round((serial - 25569) * 86400 * 1000));
+    if (!isNaN(dateObj.getTime())) {
+      const y = dateObj.getUTCFullYear();
+      const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(dateObj.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  // DD/MM/YYYY or MM/DD/YYYY format
+  const slashMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (slashMatch) {
+    const part1 = parseInt(slashMatch[1], 10);
+    const part2 = parseInt(slashMatch[2], 10);
+    const year = slashMatch[3];
+
+    // If second number > 12, it MUST be day, so first number is month (MM/DD/YYYY, e.g. 10/13/2026)
+    if (part2 > 12 && part1 <= 12) {
+      const month = String(part1).padStart(2, '0');
+      const day = String(part2).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    // If first number > 12, it MUST be day, so second number is month (DD/MM/YYYY, e.g. 15/10/2026)
+    if (part1 > 12 && part2 <= 12) {
+      const day = String(part1).padStart(2, '0');
+      const month = String(part2).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    // If part1 is 10 (October), standard US/Excel export is MM/DD/YYYY (e.g. 10/11/2026 = Oct 11)
+    if (part1 === 10) {
+      const month = '10';
+      const day = String(part2).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    // Default to DD/MM/YYYY
+    const day = String(part1).padStart(2, '0');
+    const month = String(part2).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 

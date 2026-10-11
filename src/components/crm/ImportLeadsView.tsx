@@ -140,7 +140,18 @@ export function ImportLeadsView({ onClose, onSuccess, batches }: ImportLeadsView
         const leadSourceStr = String(row['Lead Source'] || row['lead_source'] || row['Source'] || '');
         const assignedTo = String(row['Assigned To'] || row['assigned_to'] || row['Assigned'] || '');
         const callNotes = String(row['Call Notes'] || row['notes'] || row['Notes'] || '');
-        const nextFollowup = String(row['Next Followup Date'] || row['next_followup_date'] || row['Followup Date'] || '');
+        const nextFollowup = String(
+          row['Next Followup Date'] ||
+          row['Next Follow-up Date'] ||
+          row['Next Follow Up Date'] ||
+          row['Next Follow-up'] ||
+          row['Next Follow Up'] ||
+          row['next_followup_date'] ||
+          row['Followup Date'] ||
+          row['Follow-up Date'] ||
+          row['followup_date'] ||
+          ''
+        );
         const advanceStr = String(row['Advance Amount'] || row['Advance Paid'] || row['Amount Paid'] || row['advance_amount'] || '');
         const paymentDateStr = String(row['Payment Date'] || row['Advance Date'] || row['payment_date'] || '');
 
