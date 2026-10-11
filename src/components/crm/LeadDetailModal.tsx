@@ -223,8 +223,6 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           booking_stage: tempBookingStage,
           preferred_destination: tempDestination,
           destination: tempDestination,
-          departure_city: tempCity,
-          batch_id: tempBatchId,
           preferred_travel_date: tempTravelDate,
           preferred_date: tempTravelDate,
           advance_amount: tempAdvanceAmount ? parseFloat(tempAdvanceAmount) : null,
@@ -239,8 +237,6 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           booking_stage: tempBookingStage as BookingStage,
           preferred_destination: tempDestination,
           destination: tempDestination,
-          departure_city: tempCity,
-          batch_id: tempBatchId,
           preferred_travel_date: tempTravelDate,
           advance_amount: tempAdvanceAmount ? parseFloat(tempAdvanceAmount) : null,
           payment_date: tempPaymentDate || null,
@@ -617,35 +613,6 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
                 </div>
               </div>
             )}
-
-            {/* Product / Batch & Departure City */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-bold text-slate-700">Product / Trip Batch</Label>
-                <Select value={tempBatchId} onValueChange={setTempBatchId}>
-                  <SelectTrigger className="mt-1 bg-white border-slate-300 text-slate-900 text-xs">
-                    <SelectValue placeholder="-- Select Batch --" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white text-slate-900">
-                    {batches.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.title || b.destination}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs font-bold text-slate-700">Departure City (Origin)</Label>
-                <Input
-                  placeholder="e.g. Kalamassery / Kochi"
-                  value={tempCity}
-                  onChange={(e) => setTempCity(e.target.value)}
-                  className="mt-1 bg-white border-slate-300 text-slate-900 text-xs"
-                />
-              </div>
-            </div>
 
             {/* Preferred Location */}
             <div>
@@ -1132,7 +1099,13 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           lead={currentLead}
           open={completeModalOpen}
           onClose={() => setCompleteModalOpen(false)}
-          onSuccess={refreshLeadData}
+          onSuccess={(updated) => {
+            if (updated) {
+              setCurrentLead(updated);
+              onUpdate(updated);
+            }
+            refreshLeadData();
+          }}
         />
       )}
     </div>

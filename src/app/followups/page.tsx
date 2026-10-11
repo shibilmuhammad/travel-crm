@@ -711,7 +711,10 @@ export default function FollowupsPage() {
           lead={completeLead}
           open={!!completeLead}
           onClose={() => setCompleteLead(null)}
-          onSuccess={() => fetchFollowups()}
+          onSuccess={() => {
+            setCompleteLead(null);
+            fetchFollowups();
+          }}
         />
       )}
     </DashboardLayout>
