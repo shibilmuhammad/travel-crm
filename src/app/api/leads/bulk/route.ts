@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { Lead } from '@/types';
 import { getStoredLeads, saveAllStoredLeads, clearStoredLeads } from '@/lib/leadStore';
-import { clearStoredActivities } from '@/lib/activityStore';
+import { clearStoredActivities, saveStoredActivity } from '@/lib/activityStore';
 import { normalizePhoneNumber } from '@/lib/utils';
 
 export async function POST(request: NextRequest) {
@@ -59,8 +59,13 @@ export async function POST(request: NextRequest) {
         if (row.booking_stage && row.booking_stage !== 'not_contacted') {
           existing.booking_stage = row.booking_stage;
         }
-        if (row.notes) {
-          existing.notes = existing.notes ? `${existing.notes} | ${row.notes}` : row.notes;
+        if (row.notes && row.notes.trim()) {
+          const n = row.notes.trim();
+          if (!existing.notes) {
+            existing.notes = n;
+          } else if (!existing.notes.includes(n)) {
+            existing.notes = `${existing.notes} | ${n}`;
+          }
         }
         if (row.next_followup_date) {
           existing.next_followup_date = row.next_followup_date;
@@ -185,6 +190,29 @@ export async function POST(request: NextRequest) {
               updated_at: l.updated_at,
             }));
             await supabase.from('leads').upsert(basePayload, { onConflict: 'id' });
+          }
+
+          // Also automatically record activity timeline entries for any call notes from the file
+          const activitiesToUpsert = leadsToUpsert
+            .filter((l) => l.notes && l.notes.trim().length > 0 && l.notes !== '—')
+            .map((l) => ({
+              id: `act-${l.id}-note`,
+              lead_id: l.id,
+              activity_type: 'call_note',
+              activity_date: l.created_at || nowISO,
+              notes: l.notes,
+              team_member: l.assigned_team_member || 'Shibil Muhammad',
+              created_at: l.created_at || nowISO,
+            }));
+
+          activitiesToUpsert.forEach((act) => saveStoredActivity(act as any));
+
+          if (activitiesToUpsert.length > 0) {
+            try {
+              await supabase.from('lead_activities').upsert(activitiesToUpsert, { onConflict: 'id' });
+            } catch (actErr: any) {
+              console.warn('Supabase bulk activities error:', actErr?.message || actErr);
+            }
           }
         }
       } catch (dbErr: any) {

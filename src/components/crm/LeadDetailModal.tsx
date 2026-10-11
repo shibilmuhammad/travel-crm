@@ -92,6 +92,8 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
 
   // Call Log State
   const [callNote, setCallNote] = useState('');
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editNotesText, setEditNotesText] = useState('');
 
   // Assignment State
   const [assignedStaff, setAssignedStaff] = useState('Shibil Muhammad');
@@ -275,6 +277,43 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save / Update Lead Notes
+  const handleSaveLeadNotes = async () => {
+    if (!currentLead) return;
+    setLoading(true);
+    try {
+      const trimmedNotes = editNotesText.trim();
+      const res = await fetch(`/api/leads/${currentLead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: trimmedNotes }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setCurrentLead(updated);
+        setIsEditingNotes(false);
+        if (trimmedNotes) {
+          await fetch('/api/activities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              lead_id: currentLead.id,
+              activity_type: 'call_note',
+              notes: trimmedNotes,
+              team_member: assignedStaff || 'Shibil Muhammad',
+            }),
+          });
+          fetchActivities(currentLead.id);
+        }
+        onUpdate(updated);
+      }
+    } catch (e) {
+      console.error('Failed to update lead notes:', e);
     } finally {
       setLoading(false);
     }
@@ -638,6 +677,88 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           </Card>
 
           {/* Card 3: Log Call & Note */}
+          {/* Card 3: Call Notes / Remarks */}
+          <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>Call Notes & Remarks</span>
+                  {currentLead.notes && currentLead.notes.trim() && currentLead.notes !== '—' && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                      Saved
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Imported remarks from Excel or notes recorded during customer calls.
+                </p>
+              </div>
+              {!isEditingNotes && (
+                <Button
+                  onClick={() => {
+                    setEditNotesText(currentLead.notes && currentLead.notes !== '—' ? currentLead.notes : '');
+                    setIsEditingNotes(true);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs border-slate-300 text-slate-700 hover:bg-slate-50 gap-1.5 cursor-pointer"
+                >
+                  <Edit className="w-3 h-3" /> {currentLead.notes && currentLead.notes !== '—' ? 'Edit Note' : 'Add Note'}
+                </Button>
+              )}
+            </div>
+
+            {isEditingNotes ? (
+              <div className="space-y-2 mt-2">
+                <Textarea
+                  value={editNotesText}
+                  onChange={(e) => setEditNotesText(e.target.value)}
+                  placeholder="Enter call notes or customer details..."
+                  className="bg-white border-slate-300 text-xs min-h-[85px] leading-relaxed"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleSaveLeadNotes}
+                    disabled={loading}
+                    size="sm"
+                    className="bg-[#0e2a56] hover:bg-[#0a1f42] text-white text-xs font-semibold gap-1.5 cursor-pointer"
+                  >
+                    <Save className="w-3 h-3" /> Save Note
+                  </Button>
+                  <Button
+                    onClick={() => setIsEditingNotes(false)}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-slate-300 text-slate-700 cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : currentLead.notes && currentLead.notes.trim() && currentLead.notes !== '—' ? (
+              <div className="p-3.5 rounded-lg bg-amber-50/70 border border-amber-200/90 text-xs">
+                <p className="text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">
+                  {currentLead.notes}
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-500 italic flex items-center justify-between">
+                <span>No call notes recorded yet for this lead.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditNotesText('');
+                    setIsEditingNotes(true);
+                  }}
+                  className="text-blue-700 hover:underline font-semibold not-italic cursor-pointer"
+                >
+                  + Add note
+                </button>
+              </div>
+            )}
+          </Card>
+
+          {/* Card 4: Log Call & Note */}
           <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
             <div>
               <h3 className="text-sm font-bold text-slate-900">Log Call & Note</h3>
@@ -667,20 +788,41 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
             </Button>
           </Card>
 
-          {/* Card 4: Activity Timeline */}
+          {/* Card 5: Activity Timeline */}
           <Card className="bg-white border-slate-200 shadow-xs p-5">
             <h3 className="text-sm font-bold text-slate-900 mb-3">Activity Timeline</h3>
-            {activities.length === 0 ? (
+            {activities.length === 0 && (!currentLead.notes || currentLead.notes.trim() === '' || currentLead.notes === '—') ? (
               <p className="text-xs text-slate-500 italic">No notes or call logs recorded yet.</p>
             ) : (
               <div className="space-y-3">
+                {/* Fallback entry if lead has notes not already in activities list */}
+                {currentLead.notes &&
+                  currentLead.notes.trim() !== '' &&
+                  currentLead.notes !== '—' &&
+                  !activities.some((a) => a.notes === currentLead.notes) && (
+                    <div className="p-3 rounded-lg bg-amber-50/70 border border-amber-200 text-xs">
+                      <div className="flex items-center justify-between text-amber-800 font-semibold mb-1">
+                        <span className="flex items-center gap-1.5 font-bold">
+                          📝 Call Note / Excel Import
+                        </span>
+                        <span>{formatDateTime(currentLead.created_at)}</span>
+                      </div>
+                      <p className="text-slate-800 font-medium whitespace-pre-wrap">{currentLead.notes}</p>
+                    </div>
+                  )}
+
                 {activities.map((act) => (
                   <div key={act.id} className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
                     <div className="flex items-center justify-between text-slate-500 font-semibold mb-1">
-                      <span>👤 {act.team_member || 'Staff'}</span>
+                      <span className="flex items-center gap-1 font-semibold text-slate-700">
+                        👤 {act.team_member || 'Staff'}
+                        <span className="ml-1 px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded text-[10px] font-bold">
+                          {act.activity_type === 'call_note' ? 'Call Note' : 'Call Log'}
+                        </span>
+                      </span>
                       <span>{formatDateTime(act.activity_date || act.created_at)}</span>
                     </div>
-                    <p className="text-slate-800">{act.notes}</p>
+                    <p className="text-slate-800 whitespace-pre-wrap">{act.notes}</p>
                   </div>
                 ))}
               </div>

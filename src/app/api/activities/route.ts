@@ -1,16 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getStoredActivities, saveStoredActivity } from '@/lib/activityStore';
-import { updateStoredLead } from '@/lib/leadStore';
+import { updateStoredLead, getStoredLeads } from '@/lib/leadStore';
 import { LeadActivity } from '@/types';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const leadId = searchParams.get('lead_id');
 
+  const getInitialNoteActivity = (id: string): LeadActivity | null => {
+    const leads = getStoredLeads();
+    const l = leads.find((item) => item.id === id);
+    if (l && l.notes && l.notes.trim() && l.notes !== '—') {
+      return {
+        id: `act-${l.id}-initial-note`,
+        lead_id: l.id,
+        activity_type: 'call_note',
+        activity_date: l.created_at || new Date().toISOString(),
+        notes: l.notes,
+        outcome: null,
+        next_action: null,
+        next_followup_date: null,
+        team_member: l.assigned_team_member || 'Shibil Muhammad',
+        created_at: l.created_at || new Date().toISOString(),
+      };
+    }
+    return null;
+  };
+
   if (!isSupabaseConfigured()) {
     let result = getStoredActivities();
-    if (leadId) result = result.filter((i) => i.lead_id === leadId);
+    if (leadId) {
+      result = result.filter((i) => i.lead_id === leadId);
+      if (result.length === 0) {
+        const fallback = getInitialNoteActivity(leadId);
+        if (fallback) result = [fallback];
+      }
+    }
     return NextResponse.json(result);
   }
 
@@ -22,13 +48,30 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Supabase fetch lead_activities error, using local store:', error);
       let result = getStoredActivities();
-      if (leadId) result = result.filter((i) => i.lead_id === leadId);
+      if (leadId) {
+        result = result.filter((i) => i.lead_id === leadId);
+        if (result.length === 0) {
+          const fallback = getInitialNoteActivity(leadId);
+          if (fallback) result = [fallback];
+        }
+      }
       return NextResponse.json(result);
     }
-    return NextResponse.json(data || []);
+    let list = data || [];
+    if (leadId && list.length === 0) {
+      const fallback = getInitialNoteActivity(leadId);
+      if (fallback) list = [fallback];
+    }
+    return NextResponse.json(list);
   } catch (err) {
     let result = getStoredActivities();
-    if (leadId) result = result.filter((i) => i.lead_id === leadId);
+    if (leadId) {
+      result = result.filter((i) => i.lead_id === leadId);
+      if (result.length === 0) {
+        const fallback = getInitialNoteActivity(leadId);
+        if (fallback) result = [fallback];
+      }
+    }
     return NextResponse.json(result);
   }
 }

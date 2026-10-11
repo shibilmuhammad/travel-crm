@@ -38,6 +38,7 @@ const ACTIVITY_ICONS: Record<ActivityType, string> = {
   whatsapp_message: '💬',
   follow_up: '🔔',
   booking_update: '📋',
+  call_note: '📝',
   general_note: '📝',
 };
 

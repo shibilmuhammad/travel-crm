@@ -31,6 +31,7 @@ export type ActivityType =
   | 'whatsapp_message'
   | 'follow_up'
   | 'booking_update'
+  | 'call_note'
   | 'general_note';
 
 export type LeadSource =
@@ -295,6 +296,7 @@ export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
   whatsapp_message: 'WhatsApp Message',
   follow_up: 'Follow-up',
   booking_update: 'Booking Update',
+  call_note: 'Call Note',
   general_note: 'General Note',
 };
 
