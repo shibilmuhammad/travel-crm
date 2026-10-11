@@ -107,13 +107,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const match = error.message.match(/Could not find the '([^']+)' column/i);
       if (match && match[1]) {
         const missingCol = match[1];
+        // Only strip the exact column reported as missing — never blindly drop followup fields
         console.warn(`Supabase PATCH missing column '${missingCol}', stripping and retrying...`);
         delete currentPayload[missingCol];
       } else {
-        delete currentPayload.advance_amount;
-        delete currentPayload.payment_date;
-        delete currentPayload.interest_level;
-        delete currentPayload.next_followup_date;
+        // Unknown column error — break out to avoid accidentally stripping follow-up fields
+        console.warn('Supabase PATCH column error (unknown column), stopping retry:', error.message);
+        break;
       }
 
       const retryRes = await supabase

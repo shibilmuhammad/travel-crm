@@ -240,20 +240,15 @@ export default function FollowupsPage() {
           onClose={handleCloseLead}
           onUpdate={async (updatedLead) => {
             if (updatedLead) {
+              // Optimistically update the viewed lead immediately
               setViewLead(updatedLead);
+              // Also update it in allLeads so tab counts stay accurate
+              setAllLeads((prev) =>
+                prev.map((l) => (l.id === updatedLead.id ? updatedLead : l))
+              );
             }
+            // Refresh allLeads from server in background (don't await so UI isn't blocked)
             fetchFollowups();
-            try {
-              const res = await fetch(`/api/leads/${viewLead.id}`);
-              if (res.ok) {
-                const updated = await res.json();
-                if (updated && updated.id) {
-                  setViewLead(updated);
-                }
-              }
-            } catch (e) {
-              console.error(e);
-            }
           }}
           onEdit={(l) => setEditLead(l)}
           onDelete={(id) => handleDeleteLead(id)}

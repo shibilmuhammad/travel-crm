@@ -12,10 +12,12 @@ export function parseToISODate(dateStr: string | null | undefined): string {
   const trimmed = String(dateStr).trim();
   if (!trimmed) return '';
 
+  // Already ISO date (YYYY-MM-DD) — return as-is, no conversion needed
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
     return trimmed;
   }
 
+  // DD/MM/YYYY or DD-MM-YYYY format
   const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (dmyMatch) {
     const day = dmyMatch[1].padStart(2, '0');
@@ -24,17 +26,21 @@ export function parseToISODate(dateStr: string | null | undefined): string {
     return `${year}-${month}-${day}`;
   }
 
-  try {
-    const d1 = parseISO(trimmed);
-    if (!isNaN(d1.getTime())) {
-      return format(d1, 'yyyy-MM-dd');
-    }
-  } catch {}
+  // ISO timestamp with time component (e.g. 2026-10-11T00:00:00Z)
+  // Extract date part directly from the string to avoid any timezone shift
+  const isoTimestampMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})T/);
+  if (isoTimestampMatch) {
+    return isoTimestampMatch[1];
+  }
 
+  // Last resort: try parsing as a date, use local calendar date (not UTC)
   try {
-    const d2 = new Date(trimmed);
-    if (!isNaN(d2.getTime())) {
-      return format(d2, 'yyyy-MM-dd');
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
     }
   } catch {}
 

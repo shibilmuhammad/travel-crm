@@ -635,14 +635,6 @@ export default function LeadsPage() {
                             >
                               <Eye className="w-3.5 h-3.5" /> View
                             </Button>
-                            <Button
-                              onClick={() => handleDeleteLead(lead.id)}
-                              variant="outline"
-                              size="sm"
-                              className="border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium gap-1.5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-red-600" /> Delete
-                            </Button>
                           </div>
                         </td>
                       </tr>
