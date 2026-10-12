@@ -430,28 +430,28 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
       </div>
 
       {/* Two-Column Detail View Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 min-w-0">
         {/* LEFT COLUMN (7 cols) */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-4 sm:space-y-6 min-w-0">
           {/* Card 1: Profile Header */}
-          <Card className="bg-white border-slate-200 shadow-xs p-5">
-            <div className="flex items-start justify-between">
-              <div>
+          <Card className="bg-white border-slate-200 shadow-xs p-4 sm:p-5 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-xs font-mono font-bold text-blue-900">{leadCode}</div>
-                <h1 className="text-2xl font-extrabold text-slate-900 mt-1">{currentLead.full_name}</h1>
+                <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-0.5 break-words">{currentLead.full_name}</h1>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 capitalize">
+              <div className="flex items-center flex-wrap gap-2 flex-shrink-0">
+                <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 capitalize">
                   {currentLead.lead_temperature || currentLead.interest_level || 'New'}
                 </span>
                 <Button
                   onClick={() => onEdit(currentLead)}
                   variant="outline"
                   size="sm"
-                  className="border-slate-300 text-slate-700 text-xs hover:bg-slate-100 gap-1.5 cursor-pointer"
+                  className="h-8 border-slate-300 text-slate-700 text-xs hover:bg-slate-100 gap-1.5 cursor-pointer px-2.5"
                 >
-                  <Edit className="w-3 h-3" /> Edit
+                  <Edit className="w-3.5 h-3.5" /> Edit
                 </Button>
                 {onDelete && (
                   <Button
@@ -462,39 +462,39 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
                     }}
                     variant="outline"
                     size="sm"
-                    className="border-red-200 text-red-600 text-xs hover:bg-red-50 hover:border-red-300 gap-1.5 cursor-pointer"
+                    className="h-8 border-red-200 text-red-600 text-xs hover:bg-red-50 hover:border-red-300 gap-1.5 cursor-pointer px-2.5"
                   >
-                    <Trash2 className="w-3 h-3" /> Delete Lead
+                    <Trash2 className="w-3.5 h-3.5" /> Delete Lead
                   </Button>
                 )}
               </div>
             </div>
 
             {/* Contact line */}
-            <div className="flex items-center gap-4 text-xs text-slate-600 mt-3 pt-3 border-t border-slate-100">
+            <div className="flex items-center flex-wrap gap-3 sm:gap-4 text-xs text-slate-600 mt-3 pt-3 border-t border-slate-100">
               <div className="flex items-center gap-1.5 font-mono">
-                <Phone className="w-3.5 h-3.5 text-slate-400" />
+                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>{formatPhoneNumber(currentLead.whatsapp_number)}</span>
               </div>
               <a
                 href={getWhatsAppLink(currentLead.whatsapp_number)}
                 target="_blank"
                 rel="noreferrer"
-                className="p-1 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                className="p-1 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100 shrink-0"
                 title="WhatsApp"
               >
                 <MessageSquare className="w-3.5 h-3.5" />
               </a>
               {currentLead.email && (
-                <div className="flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{currentLead.email}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">{currentLead.email}</span>
                 </div>
               )}
             </div>
 
             {/* Grid attributes */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs mt-4 pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs mt-4 pt-4 border-t border-slate-100">
               <div>
                 <div className="font-bold text-slate-900">City / Origin:</div>
                 <div className="text-slate-600 mt-0.5">{currentLead.departure_city || '—'}</div>
@@ -525,7 +525,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           </Card>
 
           {/* Card 2: Lead Status & Travel Info */}
-          <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-4">
+          <Card className="bg-white border-slate-200 shadow-xs p-4 sm:p-5 space-y-4 min-w-0">
             <div>
               <h3 className="text-sm font-bold text-slate-900">Lead Status & Info</h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -685,9 +685,8 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
             </Button>
           </Card>
 
-          {/* Card 3: Log Call & Note */}
           {/* Card 3: Call Notes / Remarks */}
-          <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
+          <Card className="bg-white border-slate-200 shadow-xs p-4 sm:p-5 space-y-3 min-w-0">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -768,7 +767,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           </Card>
 
           {/* Card 4: Log Call & Note */}
-          <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
+          <Card className="bg-white border-slate-200 shadow-xs p-4 sm:p-5 space-y-3 min-w-0">
             <div>
               <h3 className="text-sm font-bold text-slate-900">Log Call & Note</h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -798,7 +797,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           </Card>
 
           {/* Card 5: Activity Timeline */}
-          <Card className="bg-white border-slate-200 shadow-xs p-5">
+          <Card className="bg-white border-slate-200 shadow-xs p-4 sm:p-5 min-w-0">
             <h3 className="text-sm font-bold text-slate-900 mb-3">Activity Timeline</h3>
             {activities.length === 0 && (!currentLead.notes || currentLead.notes.trim() === '' || currentLead.notes === '—') ? (
               <p className="text-xs text-slate-500 italic">No notes or call logs recorded yet.</p>
@@ -840,9 +839,9 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
         </div>
 
         {/* RIGHT COLUMN (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5 space-y-4 sm:space-y-6 min-w-0">
           {/* Card 1: Assignment */}
-          <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
+          <Card className="bg-white border-slate-200 shadow-xs p-4 sm:p-5 space-y-3 min-w-0">
             <h3 className="text-sm font-bold text-slate-900">Assignment</h3>
 
             <div>
@@ -872,7 +871,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           </Card>
 
           {/* Card 2: Schedule Follow-up with Time dropdown and DD/MM/YYYY formatting */}
-          <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
+          <Card className="bg-white border-slate-200 shadow-xs p-4 sm:p-5 space-y-3 min-w-0">
             <h3 className="text-sm font-bold text-slate-900">Schedule Follow-up</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1043,7 +1042,7 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
           </Card>
 
           {/* Card 3: Follow-ups Card matching Reference Image 3 */}
-          <Card className="bg-white border-slate-200 shadow-xs p-5 space-y-3">
+          <Card className="bg-white border-slate-200 shadow-xs p-4 sm:p-5 space-y-3 min-w-0">
             <h3 className="text-base font-bold text-slate-900">Follow-ups</h3>
             {currentLead.next_followup_date ? (
               <div className="space-y-3 pt-1">

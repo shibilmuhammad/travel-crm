@@ -153,7 +153,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 export function MobileSidebar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, teamMembers, setCurrentUser, logout } = useAuth();
 
   const navItems = isAdmin
     ? [
@@ -177,7 +177,8 @@ export function MobileSidebar() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+        className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
+        aria-label="Open Menu"
       >
         <Menu className="w-5 h-5" />
       </button>
@@ -185,7 +186,7 @@ export function MobileSidebar() {
       {open && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-64 bg-[#0b2147] border-r border-[#091b3a] flex flex-col text-slate-100">
+          <div className="fixed inset-y-0 left-0 w-64 bg-[#0b2147] border-r border-[#091b3a] flex flex-col text-slate-100 shadow-2xl">
             <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
@@ -196,11 +197,12 @@ export function MobileSidebar() {
                   <div className="text-[10px] uppercase text-sky-300 font-bold">{isAdmin ? 'ADMIN PANEL' : 'TELECALLER PANEL'}</div>
                 </div>
               </div>
-              <button onClick={() => setOpen(false)} className="p-1 rounded text-slate-300 hover:bg-white/10">
+              <button onClick={() => setOpen(false)} className="p-1 rounded text-slate-300 hover:bg-white/10 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <nav className="flex-1 px-3 py-4 space-y-1">
+
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
               {navItems.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
                 const Icon = item.icon;
@@ -220,6 +222,50 @@ export function MobileSidebar() {
                 );
               })}
             </nav>
+
+            {/* Mobile Account Switcher & Sign Out */}
+            <div className="p-3 border-t border-white/10 bg-[#091a38]">
+              <div className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 px-1">Switch Account</div>
+              <Select
+                value={currentUser.id}
+                onValueChange={(id) => {
+                  const selected = teamMembers.find((m) => m.id === id);
+                  if (selected) {
+                    setCurrentUser(selected);
+                    setOpen(false);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full bg-[#122e5e] border-blue-400/30 text-xs text-white h-9 focus:ring-sky-400">
+                  <div className="flex items-center gap-2 truncate">
+                    <div className="w-5 h-5 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                      {(currentUser.full_name || currentUser.name || 'U').charAt(0)}
+                    </div>
+                    <span className="truncate font-medium">{currentUser.full_name || currentUser.name}</span>
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="bg-[#0e254e] border-blue-400/30 text-white">
+                  {teamMembers.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{m.full_name || m.name}</span>
+                        <span className="text-[10px] text-sky-300 uppercase">({m.role})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <button
+                onClick={() => {
+                  logout();
+                  setOpen(false);
+                }}
+                className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 text-xs font-bold transition-all cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Sign Out
+              </button>
+            </div>
           </div>
         </div>
       )}

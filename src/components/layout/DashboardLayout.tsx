@@ -27,7 +27,7 @@ export function DashboardLayout({ children, title, description, actions }: Dashb
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900 w-full max-w-full">
       {/* Deep Navy Sidebar */}
       <div className="hidden md:flex flex-shrink-0">
         <Sidebar
@@ -37,18 +37,18 @@ export function DashboardLayout({ children, title, description, actions }: Dashb
       </div>
 
       {/* Main Area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 max-w-full overflow-hidden">
         {/* Crisp White Header Bar matching Reference Image 1 */}
-        <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white shadow-xs">
-          <div className="flex items-center gap-4">
+        <header className="flex-shrink-0 flex items-center justify-between px-3.5 sm:px-6 py-2.5 sm:py-3 border-b border-slate-200 bg-white shadow-xs min-w-0 max-w-full">
+          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
             <MobileSidebar />
-            <div>
-              {title && <h1 className="text-base font-bold text-slate-900">{title}</h1>}
-              {description && <p className="text-xs text-slate-500">{description}</p>}
+            <div className="min-w-0">
+              {title && <h1 className="text-sm sm:text-base font-bold text-slate-900 truncate">{title}</h1>}
+              {description && <p className="text-[11px] sm:text-xs text-slate-500 truncate">{description}</p>}
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             {actions && <div className="flex items-center gap-2">{actions}</div>}
 
             {/* Search Input matching Reference Image 1 Header */}
@@ -68,8 +68,8 @@ export function DashboardLayout({ children, title, description, actions }: Dashb
             </button>
 
             {/* Profile Avatar & Badge matching Reference Image 1 */}
-            <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
-              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-extrabold text-xs flex items-center justify-center border border-slate-300">
+            <div className="flex items-center gap-2 sm:gap-2.5 pl-2 sm:pl-3 border-l border-slate-200">
+              <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-extrabold text-xs flex items-center justify-center border border-slate-300 shrink-0">
                 {(currentUser.full_name || currentUser.name || 'S').charAt(0)}
               </div>
               <div className="hidden sm:flex flex-col text-left">
@@ -83,7 +83,7 @@ export function DashboardLayout({ children, title, description, actions }: Dashb
 
               <button
                 onClick={logout}
-                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors ml-1 cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
@@ -93,8 +93,8 @@ export function DashboardLayout({ children, title, description, actions }: Dashb
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6">{children}</div>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 max-w-full">
+          <div className="p-3.5 sm:p-6 max-w-full min-w-0">{children}</div>
         </div>
       </main>
     </div>

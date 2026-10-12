@@ -293,11 +293,11 @@ export default function FollowupsPage() {
 
   return (
     <DashboardLayout title="Follow-ups" description="Manage and log daily follow-up calls with customers.">
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6 min-w-0 max-w-full">
         {/* Top Controls Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 min-w-0">
           {/* Tabs: Today, Overdue, Upcoming, Done */}
-          <div className="flex items-center gap-2 bg-slate-100/70 p-1 rounded-xl border border-slate-200/80 overflow-x-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-100/70 p-1 rounded-xl border border-slate-200/80 overflow-x-auto max-w-full">
             <button
               onClick={() => setActiveTab('today')}
               className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
@@ -386,7 +386,7 @@ export default function FollowupsPage() {
         </div>
 
         {/* Filters & Sorting Toolbar */}
-        <Card className="bg-white border-slate-200 shadow-xs rounded-2xl p-4">
+        <Card className="bg-white border-slate-200 shadow-xs rounded-2xl p-3.5 sm:p-4 min-w-0 max-w-full">
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             {/* Search Input */}
             <div className="relative flex-1 min-w-[200px]">
@@ -518,7 +518,7 @@ export default function FollowupsPage() {
                 : `No follow-ups found in ${activeTab} queue.`}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-w-full">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-200/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">

@@ -371,11 +371,11 @@ export default function LeadsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6 min-w-0 max-w-full">
         {/* Main Card Container matching Reference Image 1 */}
-        <Card className="bg-white border-slate-200 shadow-xs p-6 rounded-xl space-y-6">
+        <Card className="bg-white border-slate-200 shadow-xs p-3.5 sm:p-6 rounded-xl space-y-4 sm:space-y-6 min-w-0 max-w-full">
           {/* Top Bar inside Card */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
             <div>
               <span className="px-3 py-1 text-xs font-semibold rounded-md bg-blue-50 text-blue-900 border border-blue-200">
                 {total} / 10000 leads used
@@ -617,7 +617,7 @@ export default function LeadsPage() {
           )}
 
           {/* Leads Table matching Reference Image 1 */}
-          <div className="overflow-x-auto border border-slate-100 rounded-lg">
+          <div className="overflow-x-auto border border-slate-100 rounded-lg max-w-full">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 text-slate-500 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
                 <tr>
