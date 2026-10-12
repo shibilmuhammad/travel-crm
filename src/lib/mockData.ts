@@ -13,14 +13,32 @@ export function getMockLeads(filters: Record<string, string>, leadList?: Lead[])
   let leads = leadList ? [...leadList] : [...MOCK_LEADS];
 
   if (filters.search) {
-    const s = filters.search.toLowerCase();
-    leads = leads.filter(
-      (l) =>
-        l.full_name.toLowerCase().includes(s) ||
-        l.whatsapp_number.toLowerCase().includes(s) ||
-        (l.email && l.email.toLowerCase().includes(s)) ||
-        (l.preferred_destination && l.preferred_destination.toLowerCase().includes(s))
-    );
+    const s = filters.search.toLowerCase().trim();
+    const digits = s.replace(/[^0-9]/g, '');
+    leads = leads.filter((l) => {
+      const name = (l.full_name || '').toLowerCase();
+      const phone = (l.whatsapp_number || '').toLowerCase();
+      const phoneDigits = phone.replace(/[^0-9]/g, '');
+      const email = (l.email || '').toLowerCase();
+      const dest = (l.preferred_destination || l.destination || '').toLowerCase();
+      const city = (l.departure_city || l.city || '').toLowerCase();
+
+      if (
+        name.includes(s) ||
+        phone.includes(s) ||
+        email.includes(s) ||
+        dest.includes(s) ||
+        city.includes(s)
+      ) {
+        return true;
+      }
+
+      if (digits.length >= 4 && phoneDigits.includes(digits)) {
+        return true;
+      }
+
+      return false;
+    });
   }
   if (filters.destination && filters.destination !== 'all') {
     const d = filters.destination.toLowerCase();

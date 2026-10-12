@@ -56,6 +56,7 @@ export default function LeadsPage() {
   });
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const activeReqRef = useRef<number>(0);
 
   useEffect(() => {
     fetch('/api/batches')
@@ -67,6 +68,7 @@ export default function LeadsPage() {
   }, []);
 
   const fetchLeads = useCallback(async (currentFilters = filters) => {
+    const reqId = ++activeReqRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -78,7 +80,8 @@ export default function LeadsPage() {
         params.set('assigned_team_member', currentFilters.assigned_team_member);
       }
 
-      if (currentFilters.search) params.set('search', currentFilters.search);
+      const searchVal = (currentFilters.search || '').trim();
+      if (searchVal) params.set('search', searchVal);
       if (currentFilters.destination && currentFilters.destination !== 'all') params.set('destination', currentFilters.destination);
       if (currentFilters.booking_stage && (currentFilters.booking_stage as string) !== 'all') params.set('booking_stage', currentFilters.booking_stage);
       if (currentFilters.batch_id && currentFilters.batch_id !== 'all') params.set('batch_id', currentFilters.batch_id);
@@ -89,20 +92,31 @@ export default function LeadsPage() {
 
       const res = await fetch(`/api/leads?${params}`);
       const data = await res.json();
-      setLeads(data.leads || []);
-      setTotal(data.total || 0);
+      if (reqId === activeReqRef.current) {
+        setLeads(data.leads || []);
+        setTotal(data.total || 0);
+      }
     } catch (err) {
       console.error(err);
     } finally {
-      setLoading(false);
+      if (reqId === activeReqRef.current) {
+        setLoading(false);
+      }
     }
   }, [filters, isTelecaller, currentUser]);
 
   useEffect(() => {
-    fetchLeads();
-  }, [fetchLeads]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchLeads(filters);
+    }, 250);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [filters, fetchLeads]);
 
   const handleApplyFilters = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     fetchLeads(filters);
   };
 
@@ -399,6 +413,11 @@ export default function LeadsPage() {
                 placeholder="Search name, phone, email..."
                 value={filters.search || ''}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleApplyFilters();
+                  }
+                }}
                 className="bg-white border-slate-300 text-slate-900 text-xs h-9"
               />
 

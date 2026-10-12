@@ -58,7 +58,42 @@ export async function GET(request: NextRequest) {
     let query = supabase.from('leads').select('*', { count: 'exact' });
 
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,whatsapp_number.ilike.%${search}%,whatsapp_profile_name.ilike.%${search}%`);
+      const clean = search.trim();
+      const conditions = new Set<string>();
+
+      // Safe clean text (strip commas so PostgREST doesn't split the filter)
+      const safeText = clean.replace(/,/g, '');
+      if (safeText) {
+        conditions.add(`full_name.ilike.%${safeText}%`);
+        conditions.add(`whatsapp_number.ilike.%${safeText}%`);
+        conditions.add(`whatsapp_profile_name.ilike.%${safeText}%`);
+        conditions.add(`departure_city.ilike.%${safeText}%`);
+        conditions.add(`preferred_destination.ilike.%${safeText}%`);
+      }
+
+      // Handle decoded leading space if '+' was decoded to space
+      const withoutLeadingPlus = safeText.replace(/^[\s+]+/, '');
+      if (withoutLeadingPlus && withoutLeadingPlus !== safeText) {
+        conditions.add(`whatsapp_number.ilike.%${withoutLeadingPlus}%`);
+      }
+
+      // Smart phone digits parsing
+      const digits = clean.replace(/[^0-9]/g, '');
+      if (digits.length >= 10) {
+        const last10 = digits.slice(-10);
+        const part1 = last10.slice(0, 5);
+        const part2 = last10.slice(5);
+        conditions.add(`whatsapp_number.ilike.%${last10}%`);
+        conditions.add(`whatsapp_number.ilike.%${part1} ${part2}%`);
+        conditions.add(`whatsapp_number.ilike.%+91 ${part1} ${part2}%`);
+        conditions.add(`whatsapp_number.ilike.%+91${last10}%`);
+      } else if (digits.length >= 4) {
+        conditions.add(`whatsapp_number.ilike.%${digits}%`);
+      }
+
+      if (conditions.size > 0) {
+        query = query.or(Array.from(conditions).join(','));
+      }
     }
     if (destination && destination !== 'all') {
       query = query.or(`preferred_destination.ilike.%${destination}%,destination.ilike.%${destination}%`);

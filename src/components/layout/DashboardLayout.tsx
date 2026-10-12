@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar, MobileSidebar } from './Sidebar';
 import { useAuth } from '@/context/AuthContext';
 import { Search, Bell, ChevronDown, LogOut } from 'lucide-react';
@@ -14,8 +15,16 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, title, description, actions }: DashboardLayoutProps) {
+  const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [headerSearch, setHeaderSearch] = useState('');
   const { currentUser, isAdmin, logout } = useAuth();
+
+  const handleHeaderSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && headerSearch.trim()) {
+      router.push(`/leads?search=${encodeURIComponent(headerSearch.trim())}`);
+    }
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
@@ -47,6 +56,9 @@ export function DashboardLayout({ children, title, description, actions }: Dashb
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <Input
                 placeholder="Search leads by name or phone..."
+                value={headerSearch}
+                onChange={(e) => setHeaderSearch(e.target.value)}
+                onKeyDown={handleHeaderSearch}
                 className="pl-9 h-8 text-xs bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 rounded-full"
               />
             </div>

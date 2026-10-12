@@ -190,9 +190,13 @@ export default function FollowupsPage() {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
+      const qDigits = q.replace(/[^0-9]/g, '');
+      const phone = (l.whatsapp_number || '').toLowerCase();
+      const phoneDigits = phone.replace(/[^0-9]/g, '');
       const nameMatch = (l.full_name || '').toLowerCase().includes(q);
-      const phoneMatch = (l.whatsapp_number || '').includes(q);
-      if (!nameMatch && !phoneMatch) return false;
+      const phoneMatch = phone.includes(q) || (qDigits.length >= 4 && phoneDigits.includes(qDigits));
+      const cityMatch = (l.departure_city || '').toLowerCase().includes(q);
+      if (!nameMatch && !phoneMatch && !cityMatch) return false;
     }
     return true;
   });
