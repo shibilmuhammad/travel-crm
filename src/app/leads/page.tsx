@@ -282,7 +282,7 @@ export default function LeadsPage() {
       Name: l.full_name,
       WhatsApp: l.whatsapp_number,
       Email: l.email || '',
-      Location: l.departure_city || 'Eranakulam',
+      Location: l.departure_city?.trim() || 'Not specified',
       Source: l.lead_source || 'Manual Entry',
       Status: l.lead_temperature || 'New',
       'Assigned To': l.assigned_team_member || 'Unassigned',
@@ -696,7 +696,7 @@ export default function LeadsPage() {
                           <div className="font-bold text-slate-900 text-sm">{lead.full_name}</div>
                           {lead.email && <div className="text-[11px] text-slate-500">{lead.email}</div>}
                           <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {lead.departure_city || 'Eranakulam'}
+                            <MapPin className="w-3 h-3" /> {lead.departure_city?.trim() || '—'}
                           </div>
                         </td>
 
