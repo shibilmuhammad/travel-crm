@@ -95,66 +95,66 @@ export function ActivityTimelineModal({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-white border-slate-200 shadow-2xl rounded-2xl">
         {/* Header */}
-        <DialogHeader className="p-5 sm:p-6 pb-4 border-b border-slate-100 bg-slate-50/70">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <History className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <DialogTitle className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2 flex-wrap">
-                  <span>Activity Timeline</span>
-                  <span className="text-slate-400 font-normal text-sm">/</span>
-                  <span className="text-blue-950 font-bold text-sm sm:text-base truncate">
-                    {lead.full_name}
-                  </span>
-                </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500 mt-1 flex items-center flex-wrap gap-2 sm:gap-3">
-                  <span className="font-mono font-semibold text-slate-700">
-                    {formatPhoneNumber(lead.whatsapp_number)}
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="inline-flex items-center gap-1 text-slate-600">
-                    <MapPin className="w-3 h-3 text-slate-400" />
-                    {lead.departure_city?.trim() || '—'}
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
-                      LEAD_TEMPERATURE_COLORS[tempKey] || LEAD_TEMPERATURE_COLORS.new
-                    }`}
-                  >
-                    {LEAD_TEMPERATURE_LABELS[tempKey] || 'New'}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
-                      BOOKING_STAGE_COLORS[stageKey] || BOOKING_STAGE_COLORS.not_contacted
-                    }`}
-                  >
-                    {BOOKING_STAGE_LABELS[stageKey] || 'Not Contacted'}
-                  </span>
-                </DialogDescription>
-              </div>
+        <DialogHeader className="p-5 sm:p-6 pb-4 border-b border-slate-100 bg-slate-50/70 pr-12">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <History className="w-5 h-5" />
             </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2 flex-wrap">
+                <span>Activity Timeline</span>
+                <span className="text-slate-400 font-normal text-sm">/</span>
+                <span className="text-blue-950 font-bold text-sm sm:text-base truncate">
+                  {lead.full_name}
+                </span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500 mt-1 flex items-center flex-wrap gap-2 sm:gap-3">
+                <span className="font-mono font-semibold text-slate-700">
+                  {formatPhoneNumber(lead.whatsapp_number)}
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="inline-flex items-center gap-1 text-slate-600">
+                  <MapPin className="w-3 h-3 text-slate-400" />
+                  {lead.departure_city?.trim() || '—'}
+                </span>
+                <span className="text-slate-300">•</span>
+                <span
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                    LEAD_TEMPERATURE_COLORS[tempKey] || LEAD_TEMPERATURE_COLORS.new
+                  }`}
+                >
+                  {LEAD_TEMPERATURE_LABELS[tempKey] || 'New'}
+                </span>
+                <span
+                  className={`px-2 py-0.5 text-[10px] font-bold rounded-md ${
+                    BOOKING_STAGE_COLORS[stageKey] || BOOKING_STAGE_COLORS.not_contacted
+                  }`}
+                >
+                  {BOOKING_STAGE_LABELS[stageKey] || 'Not Contacted'}
+                </span>
+              </DialogDescription>
 
-            {/* Quick action buttons */}
-            <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-              <a
-                href={getCallLink(lead.whatsapp_number)}
-                className="p-1.5 rounded-lg bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-2xs transition-colors"
-                title="Call Lead"
-              >
-                <Phone className="w-3.5 h-3.5" />
-              </a>
-              <a
-                href={getWhatsAppLink(lead.whatsapp_number)}
-                target="_blank"
-                rel="noreferrer"
-                className="p-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 shadow-2xs transition-colors"
-                title="WhatsApp Lead"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-              </a>
+              {/* Call & WhatsApp Quick Action Buttons (moved down away from the top-right close X) */}
+              <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-slate-200/60">
+                <a
+                  href={getCallLink(lead.whatsapp_number)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 shadow-2xs text-xs font-bold transition-colors cursor-pointer"
+                  title="Call Lead"
+                >
+                  <Phone className="w-3.5 h-3.5 text-slate-700" />
+                  <span>Call</span>
+                </a>
+                <a
+                  href={getWhatsAppLink(lead.whatsapp_number)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 shadow-2xs text-xs font-bold transition-colors cursor-pointer"
+                  title="WhatsApp Lead"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>WhatsApp</span>
+                </a>
+              </div>
             </div>
           </div>
         </DialogHeader>

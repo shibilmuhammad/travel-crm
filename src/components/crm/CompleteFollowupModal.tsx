@@ -235,7 +235,7 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess }: Comple
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="bg-white max-w-lg p-0 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
-        <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-white">
+        <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-white pr-12">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {showEditInfo ? (
