@@ -934,6 +934,10 @@ export default function FollowupsPage() {
             );
             fetchFollowups();
           }}
+          onCompleteFollowup={(lead) => {
+            setTimelineLead(null);
+            setCompleteLead(lead);
+          }}
           onViewFullLead={(lead) => {
             setTimelineLead(null);
             handleViewLead(lead);

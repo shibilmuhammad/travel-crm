@@ -12,6 +12,7 @@ import type { Lead, InterestLevel, LeadTemperature, BookingStage, DateFlexibilit
 import { BOOKING_STAGE_LABELS, LEAD_TEMPERATURE_LABELS } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { formatDate, generateUpcomingWeekends, WeekendOption, normalizePhoneNumber, formatPhoneNumber } from '@/lib/utils';
+import { DatePickerInput } from '@/components/ui/date-picker-input';
 
 interface LeadFormProps {
   lead?: Lead | null;
@@ -373,12 +374,13 @@ export function LeadForm({ lead, open, onClose, onSuccess }: LeadFormProps) {
                 </button>
               </div>
               {isCustomDate ? (
-                <Input
-                  type="date"
-                  value={form.preferred_travel_date}
-                  onChange={(e) => setForm({ ...form, preferred_travel_date: e.target.value })}
-                  className="mt-1 bg-white border-slate-300 text-slate-900 text-xs"
-                />
+                <div className="mt-1">
+                  <DatePickerInput
+                    value={form.preferred_travel_date}
+                    onChange={(val) => setForm({ ...form, preferred_travel_date: val })}
+                    className="bg-white border-slate-300 text-slate-900 text-xs"
+                  />
+                </div>
               ) : (
                 <Select
                   value={form.preferred_travel_date}
@@ -428,12 +430,13 @@ export function LeadForm({ lead, open, onClose, onSuccess }: LeadFormProps) {
                 </div>
                 <div>
                   <Label className="text-xs font-bold text-emerald-950">Payment Date</Label>
-                  <Input
-                    type="date"
-                    value={form.payment_date}
-                    onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
-                    className="mt-1 bg-white border-emerald-300 text-slate-900 text-xs font-semibold"
-                  />
+                  <div className="mt-1">
+                    <DatePickerInput
+                      value={form.payment_date}
+                      onChange={(val) => setForm({ ...form, payment_date: val })}
+                      className="bg-white border-emerald-300 text-slate-900 text-xs font-semibold"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

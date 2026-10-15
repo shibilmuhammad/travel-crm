@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import type { Lead, InterestLevel, BookingStage, ActivityType } from '@/types';
 import { INTEREST_LEVEL_LABELS, BOOKING_STAGE_LABELS } from '@/types';
+import { DatePickerInput } from '@/components/ui/date-picker-input';
 
 interface LogCallModalProps {
   lead: Lead;
@@ -143,12 +144,13 @@ export function LogCallModal({ lead, open, onClose, onSuccess }: LogCallModalPro
             </div>
             <div>
               <Label className="text-xs font-bold text-slate-700">Next Follow-up Date</Label>
-              <Input
-                type="date"
-                value={form.next_followup_date}
-                onChange={(e) => setForm({ ...form, next_followup_date: e.target.value })}
-                className="bg-white border-slate-300 text-slate-900 text-xs"
-              />
+              <div className="mt-1">
+                <DatePickerInput
+                  value={form.next_followup_date}
+                  onChange={(val) => setForm({ ...form, next_followup_date: val })}
+                  className="bg-white border-slate-300 text-slate-900 text-xs h-9"
+                />
+              </div>
             </div>
           </div>
 

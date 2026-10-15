@@ -33,6 +33,7 @@ import {
 import type { Lead, LeadTemperature, BookingStage } from '@/types';
 import { BOOKING_STAGE_LABELS } from '@/types';
 import { formatPhoneNumber, generateUpcomingWeekends, WeekendOption } from '@/lib/utils';
+import { DatePickerInput } from '@/components/ui/date-picker-input';
 import { useAuth } from '@/context/AuthContext';
 
 interface CompleteFollowupModalProps {
@@ -363,12 +364,13 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
                 </div>
 
                 {isCustomDate ? (
-                  <Input
-                    type="date"
-                    value={preferredDate}
-                    onChange={(e) => setPreferredDate(e.target.value)}
-                    className="mt-1 bg-white border-slate-300 text-slate-900 text-xs h-9"
-                  />
+                  <div className="mt-1">
+                    <DatePickerInput
+                      value={preferredDate}
+                      onChange={setPreferredDate}
+                      className="bg-white border-slate-300 text-slate-900 text-xs h-9"
+                    />
+                  </div>
                 ) : (
                   <Select value={preferredDate} onValueChange={setPreferredDate}>
                     <SelectTrigger className="mt-1 bg-white border-slate-300 text-slate-900 text-xs h-9">
@@ -571,10 +573,9 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
                       <Label className="text-[11px] font-bold text-slate-700 flex items-center gap-1 mb-1">
                         <Calendar className="w-3 h-3 text-slate-400" /> Next Date
                       </Label>
-                      <Input
-                        type="date"
+                      <DatePickerInput
                         value={nextDate}
-                        onChange={(e) => setNextDate(e.target.value)}
+                        onChange={setNextDate}
                         className="bg-white border-slate-300 text-slate-900 text-xs h-8"
                       />
                     </div>

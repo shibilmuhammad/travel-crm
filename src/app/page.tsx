@@ -28,21 +28,23 @@ import {
 } from '@/types';
 import {
   formatCurrency, formatDate, formatDateTime, getWhatsAppLink, getCallLink,
-  normalizePhoneNumber
+  normalizePhoneNumber, isoToDMY, formatDateNumeric
 } from '@/lib/utils';
+import { DatePickerInput } from '@/components/ui/date-picker-input';
 import { useAuth } from '@/context/AuthContext';
 
-// Helper to get date string in YYYY-MM-DD (safe for SSR prerender)
+// Helper to get date string in YYYY-MM-DD (consistent across server & client)
 function getDateStr(offsetDays = 0): string {
-  if (typeof window === 'undefined') return '';
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 // Preset range generator
 function getDateRangeFromPreset(preset: string): { start: string; end: string } {
-  if (typeof window === 'undefined') return { start: '', end: '' };
   const today = getDateStr(0);
   const now = new Date();
 
@@ -73,6 +75,7 @@ export default function DashboardPage() {
   const [datePreset, setDatePreset] = useState<string>('this_month');
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
+  const [todayStr, setTodayStr] = useState<string>('');
   const [filterDestination, setFilterDestination] = useState<string>('all');
   const [filterSource, setFilterSource] = useState<string>('all');
   const [filterStaff, setFilterStaff] = useState<string>(
@@ -102,16 +105,23 @@ export default function DashboardPage() {
   });
   const [batchSubmitting, setBatchSubmitting] = useState(false);
 
-  // Compute active start & end dates
-  const activeDateRange = useMemo(() => {
+  // Compute active start & end dates safely after client mount to prevent hydration mismatch
+  const [activeDateRange, setActiveDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    setTodayStr(getDateStr(0));
     if (datePreset === 'custom') {
-      return { start: customStart, end: customEnd };
+      setActiveDateRange({ start: customStart, end: customEnd });
+    } else {
+      setActiveDateRange(getDateRangeFromPreset(datePreset));
     }
-    return getDateRangeFromPreset(datePreset);
   }, [datePreset, customStart, customEnd]);
 
   // Fetch all core data
   const fetchData = useCallback(async () => {
+    if (!isMounted) return;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -147,11 +157,13 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeDateRange, filterDestination, filterSource, filterStaff]);
+  }, [isMounted, activeDateRange, filterDestination, filterSource, filterStaff]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (isMounted) {
+      fetchData();
+    }
+  }, [fetchData, isMounted]);
 
   // Extract unique destinations for filter dropdown
   const uniqueDestinations = useMemo(() => {
@@ -190,7 +202,6 @@ export default function DashboardPage() {
   const totalLeads = cohortLeads.length;
   const newLeads = cohortLeads.filter((l) => l.lead_temperature === 'new' || l.interest_level === 'new').length;
   const hotLeads = cohortLeads.filter((l) => l.lead_temperature === 'hot' || l.interest_level === 'high_intent').length;
-  const todayStr = getDateStr(0);
 
   const followupsTodayList = leads.filter((l) => {
     if (filterStaff !== 'all' && (l.assigned_team_member || '').toLowerCase() !== filterStaff.toLowerCase()) return false;
@@ -595,24 +606,26 @@ export default function DashboardPage() {
 
             {/* Custom Date Range Row if 'custom' is selected */}
             {datePreset === 'custom' && (
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100 flex-wrap">
                 <div className="flex items-center gap-1.5 text-xs text-slate-600">
                   <span>From:</span>
-                  <Input
-                    type="date"
-                    value={customStart}
-                    onChange={(e) => setCustomStart(e.target.value)}
-                    className="h-8 w-36 text-xs bg-slate-50"
-                  />
+                  <div className="w-36">
+                    <DatePickerInput
+                      value={customStart}
+                      onChange={setCustomStart}
+                      className="h-8 text-xs bg-slate-50"
+                    />
+                  </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-slate-600">
                   <span>To:</span>
-                  <Input
-                    type="date"
-                    value={customEnd}
-                    onChange={(e) => setCustomEnd(e.target.value)}
-                    className="h-8 w-36 text-xs bg-slate-50"
-                  />
+                  <div className="w-36">
+                    <DatePickerInput
+                      value={customEnd}
+                      onChange={setCustomEnd}
+                      className="h-8 text-xs bg-slate-50"
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -622,8 +635,8 @@ export default function DashboardPage() {
               <span>
                 Cohort metrics are calculated from <strong>Enquiry Date (Created At)</strong>. Advance Payments reflect actual receipts. Demand clusters group by <strong>Preferred Travel Date</strong>.
               </span>
-              <span className="font-mono text-slate-700 font-semibold flex-shrink-0">
-                {activeDateRange.start ? `${activeDateRange.start} → ${activeDateRange.end}` : 'All Time'}
+              <span suppressHydrationWarning className="font-mono text-slate-700 font-semibold flex-shrink-0">
+                {isMounted && activeDateRange.start ? `${isoToDMY(activeDateRange.start)} → ${isoToDMY(activeDateRange.end)}` : 'All Time'}
               </span>
             </div>
           </div>
@@ -1360,12 +1373,11 @@ export default function DashboardPage() {
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">Proposed Date</label>
-                <Input
-                  type="date"
+                <DatePickerInput
                   value={batchForm.proposed_date}
-                  onChange={(e) => setBatchForm({ ...batchForm, proposed_date: e.target.value })}
+                  onChange={(val) => setBatchForm({ ...batchForm, proposed_date: val })}
                   required
-                  className="h-8 text-xs"
+                  className="h-8 text-xs bg-white"
                 />
               </div>
 

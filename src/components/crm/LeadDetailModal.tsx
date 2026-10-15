@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import type { Lead, LeadActivity, LeadTemperature, BookingStage, TripBatch } from '@/types';
 import { BOOKING_STAGE_LABELS, LEAD_TEMPERATURE_LABELS } from '@/types';
 import { formatDate, formatDateTime, formatPhoneNumber, parseToISODate, getWhatsAppLink, getCallLink, generateUpcomingWeekends, WeekendOption } from '@/lib/utils';
+import { DatePickerInput } from '@/components/ui/date-picker-input';
 import { useAuth } from '@/context/AuthContext';
 
 import { CompleteFollowupModal } from '@/components/crm/CompleteFollowupModal';
@@ -609,12 +610,13 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
                   </div>
                   <div>
                     <Label className="text-xs font-bold text-emerald-950">Payment Date *</Label>
-                    <Input
-                      type="date"
-                      value={tempPaymentDate}
-                      onChange={(e) => setTempPaymentDate(e.target.value)}
-                      className="mt-1 bg-white border-emerald-300 text-slate-900 text-xs font-semibold"
-                    />
+                    <div className="mt-1">
+                      <DatePickerInput
+                        value={tempPaymentDate}
+                        onChange={setTempPaymentDate}
+                        className="bg-white border-emerald-300 text-slate-900 text-xs font-semibold"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -659,12 +661,13 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
               </div>
 
               {isCustomDate ? (
-                <Input
-                  type="date"
-                  value={tempTravelDate}
-                  onChange={(e) => setTempTravelDate(e.target.value)}
-                  className="mt-1 bg-white border-slate-300 text-slate-900 text-xs"
-                />
+                <div className="mt-1">
+                  <DatePickerInput
+                    value={tempTravelDate}
+                    onChange={setTempTravelDate}
+                    className="bg-white border-slate-300 text-slate-900 text-xs"
+                  />
+                </div>
               ) : (
                 <Select value={tempTravelDate} onValueChange={setTempTravelDate}>
                   <SelectTrigger className="mt-1 bg-white border-slate-300 text-slate-900 text-xs">

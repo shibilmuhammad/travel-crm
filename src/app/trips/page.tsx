@@ -16,6 +16,7 @@ import {
 import type { TripBatch, BatchStatus } from '@/types';
 import { BATCH_STATUS_LABELS } from '@/types';
 import { formatDate, formatCurrency } from '@/lib/utils';
+import { DatePickerInput } from '@/components/ui/date-picker-input';
 
 export default function TripsPage() {
   const [batches, setBatches] = useState<TripBatch[]>([]);
@@ -317,21 +318,19 @@ export default function TripsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">Departure Date</Label>
-                <Input
-                  type="date"
+                <DatePickerInput
                   value={formData.proposed_date}
-                  onChange={(e) => setFormData({ ...formData, proposed_date: e.target.value })}
-                  className="bg-white border-slate-300 text-xs"
+                  onChange={(val) => setFormData({ ...formData, proposed_date: val })}
+                  className="bg-white border-slate-300 text-xs h-9"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">End Date (Optional)</Label>
-                <Input
-                  type="date"
+                <DatePickerInput
                   value={formData.end_date}
-                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  className="bg-white border-slate-300 text-xs"
+                  onChange={(val) => setFormData({ ...formData, end_date: val })}
+                  className="bg-white border-slate-300 text-xs h-9"
                 />
               </div>
             </div>

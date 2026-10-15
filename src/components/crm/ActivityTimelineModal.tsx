@@ -23,6 +23,7 @@ import {
   FileText,
   ExternalLink,
   Sparkles,
+  Check,
 } from 'lucide-react';
 import type { Lead, LeadActivity, LeadTemperature, BookingStage } from '@/types';
 import {
@@ -45,6 +46,7 @@ interface ActivityTimelineModalProps {
   onClose: () => void;
   onLeadUpdated?: (updatedLead: Lead) => void;
   onViewFullLead?: (lead: Lead) => void;
+  onCompleteFollowup?: (lead: Lead) => void;
 }
 
 export function ActivityTimelineModal({
@@ -52,6 +54,7 @@ export function ActivityTimelineModal({
   open,
   onClose,
   onViewFullLead,
+  onCompleteFollowup,
 }: ActivityTimelineModalProps) {
   const [activities, setActivities] = useState<LeadActivity[]>([]);
   const [loading, setLoading] = useState(false);
@@ -273,7 +276,19 @@ export function ActivityTimelineModal({
 
         {/* Footer */}
         <DialogFooter className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50/70 flex sm:items-center sm:justify-between gap-2">
-          {onViewFullLead ? (
+          {onCompleteFollowup ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                onClose();
+                onCompleteFollowup(lead);
+              }}
+              className="bg-[#0e2a56] hover:bg-[#0a1f42] text-white text-xs font-bold px-3.5 py-1.5 rounded-lg gap-1.5 cursor-pointer shadow-2xs flex items-center"
+            >
+              <Check className="w-3.5 h-3.5" /> Mark Done
+            </Button>
+          ) : onViewFullLead ? (
             <Button
               type="button"
               variant="outline"

@@ -81,6 +81,41 @@ export function parseToISODate(dateStr: string | null | undefined): string {
   return trimmed;
 }
 
+export function isoToDMY(isoDateStr?: string | null): string {
+  if (!isoDateStr) return '';
+  const clean = String(isoDateStr).trim().split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+  }
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(clean)) {
+    const p = clean.split('/');
+    return `${p[0].padStart(2, '0')}/${p[1].padStart(2, '0')}/${p[2]}`;
+  }
+  return clean;
+}
+
+export function dmyToISO(dmyStr?: string | null): string {
+  if (!dmyStr) return '';
+  const parts = String(dmyStr).trim().split(/[/.-]/);
+  if (parts.length === 3) {
+    let [d, m, y] = parts;
+    if (d.length === 4 && y.length <= 2) {
+      [y, m, d] = [d, m, y];
+    }
+    if (y.length === 2) {
+      y = `20${y}`;
+    }
+    return `${y.padStart(4, '20')}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return dmyStr;
+}
+
+export function formatDateNumeric(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  return isoToDMY(parseToISODate(dateStr)) || dateStr;
+}
+
 export function formatDate(dateStr: string | null | undefined, fmt = 'd MMM yyyy'): string {
   if (!dateStr) return '—';
   try {
