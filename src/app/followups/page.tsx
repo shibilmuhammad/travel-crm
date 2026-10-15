@@ -12,7 +12,7 @@ import { CompleteFollowupModal } from '@/components/crm/CompleteFollowupModal';
 import { ActivityTimelineModal } from '@/components/crm/ActivityTimelineModal';
 import {
   Eye, Check, RefreshCw, CheckCircle2, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X,
-  Phone, MessageSquare, MapPin, History
+  Phone, MessageSquare, MapPin, History, Users, UserCheck
 } from 'lucide-react';
 import type { Lead, BookingStage, LeadTemperature } from '@/types';
 import {
@@ -55,6 +55,64 @@ export default function FollowupsPage() {
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [completeLead, setCompleteLead] = useState<Lead | null>(null);
   const [timelineLead, setTimelineLead] = useState<Lead | null>(null);
+
+  // Multi-select and bulk assignment states
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [targetAssignee, setTargetAssignee] = useState<string>('');
+  const [bulkAssigning, setBulkAssigning] = useState<boolean>(false);
+  const [assignSuccessMessage, setAssignSuccessMessage] = useState<string>('');
+
+  // Clear selections when switching tabs
+  useEffect(() => {
+    setSelectedLeadIds([]);
+  }, [activeTab]);
+
+  const availableAssignees = Array.from(
+    new Set([
+      ...teamMembers.map((m) => m.full_name || m.name || '').filter(Boolean),
+      ...allLeads.map((l) => l.assigned_team_member || '').filter(Boolean),
+    ])
+  );
+
+  const handleBulkAssign = async () => {
+    if (!targetAssignee || selectedLeadIds.length === 0) return;
+    setBulkAssigning(true);
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: selectedLeadIds,
+          updates: { assigned_team_member: targetAssignee },
+        }),
+      });
+
+      if (res.ok) {
+        const count = selectedLeadIds.length;
+        const assignee = targetAssignee;
+        setAllLeads((prev) =>
+          prev.map((l) =>
+            selectedLeadIds.includes(l.id)
+              ? { ...l, assigned_team_member: assignee }
+              : l
+          )
+        );
+        setSelectedLeadIds([]);
+        setTargetAssignee('');
+        setAssignSuccessMessage(`Successfully reassigned ${count} lead${count > 1 ? 's' : ''} to ${assignee}!`);
+        setTimeout(() => setAssignSuccessMessage(''), 4500);
+        fetchFollowups();
+      } else {
+        alert('Failed to update lead assignments.');
+      }
+    } catch (err) {
+      console.error('Error during bulk assign:', err);
+      alert('An error occurred during bulk assignment.');
+    } finally {
+      setBulkAssigning(false);
+    }
+  };
+
 
   const fetchFollowups = useCallback(async () => {
     setLoading(true);
@@ -509,6 +567,86 @@ export default function FollowupsPage() {
             )}
           </div>
 
+          {/* Success message banner */}
+          {assignSuccessMessage && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{assignSuccessMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssignSuccessMessage('')}
+                className="text-emerald-600 hover:text-emerald-800 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Bulk Assign Toolbar */}
+          {selectedLeadIds.length > 0 && (
+            <div className="p-3.5 bg-blue-50/90 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-blue-800" />
+                  {selectedLeadIds.length} lead{selectedLeadIds.length > 1 ? 's' : ''} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLeadIds([])}
+                  className="text-xs text-blue-700 hover:text-blue-900 underline font-medium cursor-pointer"
+                >
+                  Deselect all
+                </button>
+                {selectedLeadIds.length < sortedLeads.length && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLeadIds(sortedLeads.map((l) => l.id))}
+                    className="text-xs text-blue-700 hover:text-blue-900 underline font-medium cursor-pointer"
+                  >
+                    Select all visible ({sortedLeads.length})
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <div className="w-52">
+                  <Select value={targetAssignee} onValueChange={setTargetAssignee}>
+                    <SelectTrigger className="h-8 text-xs bg-white border-blue-200 text-slate-800 font-medium">
+                      <SelectValue placeholder="Assign to staff..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white text-xs text-slate-800">
+                      {availableAssignees.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={handleBulkAssign}
+                  disabled={!targetAssignee || bulkAssigning}
+                  size="sm"
+                  className="bg-[#0e2a56] hover:bg-[#0a1f42] text-white text-xs font-bold h-8 px-3.5 gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                >
+                  {bulkAssigning ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Assigning…
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="w-3.5 h-3.5" /> Assign Selected
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center h-48">
               <RefreshCw className="w-6 h-6 animate-spin text-slate-400" />
@@ -524,6 +662,27 @@ export default function FollowupsPage() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-slate-200/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="w-10 px-3 pb-3 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all leads"
+                        checked={sortedLeads.length > 0 && selectedLeadIds.length === sortedLeads.length}
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate =
+                              selectedLeadIds.length > 0 && selectedLeadIds.length < sortedLeads.length;
+                          }
+                        }}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedLeadIds(sortedLeads.map((l) => l.id));
+                          } else {
+                            setSelectedLeadIds([]);
+                          }
+                        }}
+                        className="rounded border-slate-300 text-blue-900 focus:ring-blue-900 cursor-pointer w-4 h-4"
+                      />
+                    </th>
                     <th
                       onClick={() => handleHeaderSort('scheduled')}
                       className="pb-3 font-semibold cursor-pointer hover:text-slate-700 transition-colors select-none"
@@ -599,11 +758,31 @@ export default function FollowupsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {sortedLeads.map((lead) => {
+                    const isSelected = selectedLeadIds.includes(lead.id);
                     const tempKey: LeadTemperature = lead.lead_temperature || 'new';
                     const stageKey: BookingStage = lead.booking_stage || 'not_contacted';
 
                     return (
-                      <tr key={lead.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr
+                        key={lead.id}
+                        className={`transition-colors ${
+                          isSelected ? 'bg-blue-50/70 hover:bg-blue-50' : 'hover:bg-slate-50/80'
+                        }`}
+                      >
+                        <td className="px-3 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${lead.full_name}`}
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setSelectedLeadIds((prev) =>
+                                isSelected ? prev.filter((id) => id !== lead.id) : [...prev, lead.id]
+                              );
+                            }}
+                            className="rounded border-slate-300 text-blue-900 focus:ring-blue-900 cursor-pointer w-4 h-4"
+                          />
+                        </td>
                         <td className="py-4 font-semibold text-slate-900 whitespace-nowrap">
                           <div>{formatDate(lead.next_followup_date)}</div>
                           <div className="text-[11px] text-slate-400 font-normal">
@@ -733,6 +912,12 @@ export default function FollowupsPage() {
           onSuccess={() => {
             setCompleteLead(null);
             fetchFollowups();
+          }}
+          onLeadUpdated={(updatedLead) => {
+            setCompleteLead(updatedLead);
+            setAllLeads((prev) =>
+              prev.map((l) => (l.id === updatedLead.id ? { ...l, ...updatedLead } : l))
+            );
           }}
         />
       )}

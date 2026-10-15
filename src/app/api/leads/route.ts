@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getMockLeads } from '@/lib/mockData';
 import { Lead } from '@/types';
-import { getStoredLeads, saveStoredLead, saveAllStoredLeads, deleteStoredLeads } from '@/lib/leadStore';
+import { getStoredLeads, saveStoredLead, saveAllStoredLeads, deleteStoredLeads, updateStoredLead } from '@/lib/leadStore';
 import { deleteStoredActivitiesByLeadIds } from '@/lib/activityStore';
 import { normalizePhoneNumber } from '@/lib/utils';
 
@@ -405,3 +405,44 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: err.message || 'Failed to bulk delete leads' }, { status: 500 });
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const ids: string[] = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
+    const updates = body.updates || {};
+
+    if (!ids || ids.length === 0) {
+      return NextResponse.json({ error: 'No lead IDs provided for update' }, { status: 400 });
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    // 1. Update in local storage
+    for (const id of ids) {
+      updateStoredLead(id, updates);
+    }
+
+    // 2. Update in Supabase if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = createSupabaseClient();
+        const patchPayload: Record<string, any> = { ...updates };
+        const { error } = await supabase.from('leads').update(patchPayload).in('id', ids);
+        if (error) console.error('Supabase bulk update leads error:', error.message);
+      } catch (sbErr: any) {
+        console.warn('Supabase bulk update error:', sbErr?.message || sbErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      count: ids.length,
+      message: `Successfully updated ${ids.length} lead(s).`,
+    });
+  } catch (err: any) {
+    console.error('Error during bulk update leads:', err);
+    return NextResponse.json({ error: err.message || 'Failed to bulk update leads' }, { status: 500 });
+  }
+}
+

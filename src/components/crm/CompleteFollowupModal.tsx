@@ -40,6 +40,7 @@ interface CompleteFollowupModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (updatedLead?: Lead) => void;
+  onLeadUpdated?: (updatedLead: Lead) => void;
 }
 
 const TIME_OPTIONS = [
@@ -68,9 +69,10 @@ function getDateISO(daysAhead = 0): string {
   return `${y}-${m}-${day}`;
 }
 
-export function CompleteFollowupModal({ lead, open, onClose, onSuccess }: CompleteFollowupModalProps) {
+export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUpdated }: CompleteFollowupModalProps) {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [currentLead, setCurrentLead] = useState<Lead | null>(lead);
 
   // 1. Lead Status
   const [status, setStatus] = useState<LeadTemperature>('warm');
@@ -103,6 +105,7 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess }: Comple
 
   useEffect(() => {
     if (lead) {
+      setCurrentLead(lead);
       const currentTemp = (lead.lead_temperature || lead.interest_level || 'warm') as LeadTemperature;
       setStatus(currentTemp);
 
@@ -130,12 +133,13 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess }: Comple
   if (!lead) return null;
 
   const handleSaveInfoOnly = async () => {
-    if (!lead) return;
+    const activeLead = currentLead || lead;
+    if (!activeLead) return;
     setSavingInfoOnly(true);
     try {
       const nowISO = new Date().toISOString();
       const patchPayload = {
-        full_name: fullName.trim() || lead.full_name,
+        full_name: fullName.trim() || activeLead.full_name,
         departure_city: departureCity.trim() || null,
         destination: preferredLocation.trim() || null,
         preferred_destination: preferredLocation.trim() || null,
@@ -144,7 +148,7 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess }: Comple
         updated_at: nowISO,
       };
 
-      const res = await fetch(`/api/leads/${lead.id}`, {
+      const res = await fetch(`/api/leads/${activeLead.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patchPayload),
@@ -152,7 +156,9 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess }: Comple
 
       if (res.ok) {
         const updatedLead = await res.json();
-        if (onSuccess) onSuccess(updatedLead);
+        setCurrentLead(updatedLead);
+        if (onLeadUpdated) onLeadUpdated(updatedLead);
+        // Switch back to the previous popup (Mark Follow-up Call Done) instead of closing
         setShowEditInfo(false);
       }
     } catch (e) {

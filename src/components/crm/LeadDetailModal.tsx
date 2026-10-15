@@ -1111,6 +1111,12 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
             }
             refreshLeadData();
           }}
+          onLeadUpdated={(updated) => {
+            if (updated) {
+              setCurrentLead(updated);
+              onUpdate(updated);
+            }
+          }}
         />
       )}
     </div>
