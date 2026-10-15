@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LeadDetailModal } from '@/components/crm/LeadDetailModal';
 import { LeadForm } from '@/components/crm/LeadForm';
 import { CompleteFollowupModal } from '@/components/crm/CompleteFollowupModal';
+import { ActivityTimelineModal } from '@/components/crm/ActivityTimelineModal';
 import {
   Eye, Check, RefreshCw, CheckCircle2, Search, ArrowUpDown, ArrowUp, ArrowDown, Filter, X,
-  Phone, MessageSquare
+  Phone, MessageSquare, MapPin, History
 } from 'lucide-react';
 import type { Lead, BookingStage, LeadTemperature } from '@/types';
 import {
@@ -53,6 +54,7 @@ export default function FollowupsPage() {
   const [viewLead, setViewLead] = useState<Lead | null>(null);
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [completeLead, setCompleteLead] = useState<Lead | null>(null);
+  const [timelineLead, setTimelineLead] = useState<Lead | null>(null);
 
   const fetchFollowups = useCallback(async () => {
     setLoading(true);
@@ -610,6 +612,9 @@ export default function FollowupsPage() {
                         </td>
                         <td className="py-4">
                           <div className="font-extrabold text-slate-900">{lead.full_name}</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {lead.departure_city?.trim() || '—'}
+                          </div>
                           <div className="flex items-center gap-1.5 mt-1">
                             <a
                               href={getCallLink(lead.whatsapp_number)}
@@ -676,6 +681,16 @@ export default function FollowupsPage() {
                             </a>
 
                             <Button
+                              onClick={() => setTimelineLead(lead)}
+                              variant="outline"
+                              size="sm"
+                              className="bg-white border-slate-300 text-slate-800 hover:bg-slate-100 text-xs font-bold px-3 py-1 rounded-lg gap-1.5 cursor-pointer shadow-2xs"
+                              title="View Activity Timeline"
+                            >
+                              <History className="w-3.5 h-3.5 text-blue-900" /> Activities
+                            </Button>
+
+                            <Button
                               onClick={() => handleViewLead(lead)}
                               variant="outline"
                               size="sm"
@@ -718,6 +733,25 @@ export default function FollowupsPage() {
           onSuccess={() => {
             setCompleteLead(null);
             fetchFollowups();
+          }}
+        />
+      )}
+
+      {/* Activity Timeline Modal */}
+      {timelineLead && (
+        <ActivityTimelineModal
+          lead={timelineLead}
+          open={!!timelineLead}
+          onClose={() => setTimelineLead(null)}
+          onLeadUpdated={(updatedLead) => {
+            setAllLeads((prev) =>
+              prev.map((l) => (l.id === updatedLead.id ? { ...l, ...updatedLead } : l))
+            );
+            fetchFollowups();
+          }}
+          onViewFullLead={(lead) => {
+            setTimelineLead(null);
+            handleViewLead(lead);
           }}
         />
       )}

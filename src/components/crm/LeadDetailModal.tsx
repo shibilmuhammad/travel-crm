@@ -471,20 +471,26 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
             </div>
 
             {/* Contact line */}
-            <div className="flex items-center flex-wrap gap-3 sm:gap-4 text-xs text-slate-600 mt-3 pt-3 border-t border-slate-100">
-              <div className="flex items-center gap-1.5 font-mono">
-                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>{formatPhoneNumber(currentLead.whatsapp_number)}</span>
+            <div className="flex items-center flex-wrap gap-2.5 sm:gap-4 text-xs text-slate-600 mt-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={getCallLink(currentLead.whatsapp_number)}
+                  className="p-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 shrink-0 transition-colors"
+                  title="Call Phone"
+                >
+                  <Phone className="w-3.5 h-3.5 text-slate-700" />
+                </a>
+                <a
+                  href={getWhatsAppLink(currentLead.whatsapp_number)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-1 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 shrink-0 transition-colors"
+                  title="WhatsApp"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                </a>
+                <span className="font-mono text-slate-700 font-semibold">{formatPhoneNumber(currentLead.whatsapp_number)}</span>
               </div>
-              <a
-                href={getWhatsAppLink(currentLead.whatsapp_number)}
-                target="_blank"
-                rel="noreferrer"
-                className="p-1 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100 shrink-0"
-                title="WhatsApp"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-              </a>
               {currentLead.email && (
                 <div className="flex items-center gap-1.5 min-w-0">
                   <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
