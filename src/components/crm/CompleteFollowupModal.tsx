@@ -29,10 +29,13 @@ import {
   MapPin,
   Save,
   ArrowLeft,
+  Luggage,
+  ArrowRightLeft,
+  Check,
 } from 'lucide-react';
-import type { Lead, LeadTemperature, BookingStage } from '@/types';
+import type { Lead, LeadTemperature, BookingStage, TripBatch } from '@/types';
 import { BOOKING_STAGE_LABELS } from '@/types';
-import { formatPhoneNumber, generateUpcomingWeekends, WeekendOption } from '@/lib/utils';
+import { formatPhoneNumber, generateUpcomingWeekends, WeekendOption, formatDateNumeric } from '@/lib/utils';
 import { DatePickerInput } from '@/components/ui/date-picker-input';
 import { useAuth } from '@/context/AuthContext';
 
@@ -75,6 +78,12 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
   const [loading, setLoading] = useState(false);
   const [currentLead, setCurrentLead] = useState<Lead | null>(lead);
 
+  // Batches state
+  const [batches, setBatches] = useState<TripBatch[]>([]);
+  const [batchId, setBatchId] = useState<string>('');
+  const [showChangeBatch, setShowChangeBatch] = useState(false);
+  const [savingBatchOnly, setSavingBatchOnly] = useState(false);
+
   // 1. Lead Status
   const [status, setStatus] = useState<LeadTemperature>('warm');
 
@@ -99,9 +108,41 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
   const [savingInfoOnly, setSavingInfoOnly] = useState(false);
   const [weekendOptions, setWeekendOptions] = useState<WeekendOption[]>([]);
 
+  const resolveBatchId = (targetLead: Lead | null | undefined, batchList: TripBatch[]) => {
+    if (!targetLead || batchList.length === 0) return '';
+    if (targetLead.batch_id && batchList.some((b) => b.id === targetLead.batch_id)) {
+      return targetLead.batch_id;
+    }
+    const lDest = (targetLead.preferred_destination || targetLead.destination || '').toLowerCase().trim();
+    if (lDest) {
+      const match = batchList.find((b) => {
+        const bTitle = (b.title || '').toLowerCase().trim();
+        const bDest = (b.destination || '').toLowerCase().trim();
+        return bTitle.includes(lDest) || lDest.includes(bTitle) || bDest.includes(lDest) || lDest.includes(bDest);
+      });
+      if (match) return match.id;
+    }
+    return '';
+  };
+
   useEffect(() => {
     const weekends = generateUpcomingWeekends(3);
     setWeekendOptions(weekends);
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/batches')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setBatches(data);
+          if (lead && !batchId) {
+            const matched = lead.batch_id || resolveBatchId(lead, data);
+            if (matched) setBatchId(matched);
+          }
+        }
+      })
+      .catch((err) => console.error('Error fetching batches:', err));
   }, []);
 
   useEffect(() => {
@@ -127,11 +168,75 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
       const isWeekendMatch = generateUpcomingWeekends(3).some((w) => w.value === prefDate);
       setIsCustomDate(Boolean(prefDate && !isWeekendMatch && prefDate !== 'Any Future Trip / Flexible Date'));
 
+      const matchedBatch = lead.batch_id || (batches.length > 0 ? resolveBatchId(lead, batches) : '');
+      setBatchId(matchedBatch || '');
+
       setShowEditInfo(false);
+      setShowChangeBatch(false);
     }
   }, [lead, open]);
 
   if (!lead) return null;
+
+  const currentSelectedBatch =
+    batches.find((b) => b.id === (batchId === 'none' ? '' : batchId)) ||
+    batches.find((b) => b.id === (currentLead?.batch_id || lead?.batch_id));
+
+  const handleSaveBatchOnly = async () => {
+    const activeLead = currentLead || lead;
+    if (!activeLead) return;
+    setSavingBatchOnly(true);
+    try {
+      const nowISO = new Date().toISOString();
+      const finalBatchId = batchId === 'none' ? null : (batchId || null);
+      const selectedBatch = batches.find((b) => b.id === finalBatchId);
+
+      const patchPayload: Record<string, any> = {
+        batch_id: finalBatchId,
+        updated_at: nowISO,
+      };
+
+      if (selectedBatch?.destination) {
+        patchPayload.destination = selectedBatch.destination;
+        patchPayload.preferred_destination = selectedBatch.destination;
+        setPreferredLocation(selectedBatch.destination);
+      }
+
+      const res = await fetch(`/api/leads/${activeLead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchPayload),
+      });
+
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setCurrentLead(updatedLead);
+        if (onLeadUpdated) onLeadUpdated(updatedLead);
+
+        const staffName = currentUser?.full_name || currentUser?.name || activeLead.assigned_team_member || 'Shibil Muhammad';
+        const batchName = selectedBatch ? (selectedBatch.title || selectedBatch.destination) : 'None';
+        await fetch('/api/activities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lead_id: activeLead.id,
+            activity_type: 'note',
+            notes: `Trip batch changed to: ${batchName}`,
+            outcome: 'Batch Updated',
+            team_member: staffName,
+          }),
+        });
+
+        // Switch back to follow-up view
+        setShowChangeBatch(false);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error updating trip batch.');
+    } finally {
+      setSavingBatchOnly(false);
+    }
+  };
 
   const handleSaveInfoOnly = async () => {
     const activeLead = currentLead || lead;
@@ -139,13 +244,15 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
     setSavingInfoOnly(true);
     try {
       const nowISO = new Date().toISOString();
-      const patchPayload = {
+      const finalBatchId = batchId === 'none' ? null : (batchId || activeLead.batch_id || null);
+      const patchPayload: Record<string, any> = {
         full_name: fullName.trim() || activeLead.full_name,
         departure_city: departureCity.trim() || null,
         destination: preferredLocation.trim() || null,
         preferred_destination: preferredLocation.trim() || null,
         preferred_date: preferredDate.trim() || null,
         preferred_travel_date: preferredDate.trim() || null,
+        batch_id: finalBatchId,
         updated_at: nowISO,
       };
 
@@ -175,6 +282,7 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
     try {
       const staffName = currentUser?.full_name || currentUser?.name || lead.assigned_team_member || 'Shibil Muhammad';
       const nowISO = new Date().toISOString();
+      const finalBatchId = batchId === 'none' ? null : (batchId || lead.batch_id || null);
 
       const patchPayload: Record<string, any> = {
         full_name: fullName.trim() || lead.full_name,
@@ -183,6 +291,7 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
         preferred_destination: preferredLocation.trim() || null,
         preferred_date: preferredDate.trim() || null,
         preferred_travel_date: preferredDate.trim() || null,
+        batch_id: finalBatchId,
         lead_temperature: status,
         interest_level: status,
         booking_stage: stage,
@@ -211,9 +320,13 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
         ? note.trim()
         : `Follow-up call completed. Lead status: ${status}, booking stage: ${BOOKING_STAGE_LABELS[stage] || stage}.`;
 
+      const batchLabel = currentSelectedBatch
+        ? ` | Trip Batch: ${currentSelectedBatch.title || currentSelectedBatch.destination}`
+        : '';
+
       const activityText = scheduleNext && nextDate
-        ? `[Follow-up Completed] ${noteContent} | Next scheduled: ${nextDate} at ${nextTime}`
-        : `[Follow-up Completed] ${noteContent}`;
+        ? `[Follow-up Completed] ${noteContent}${batchLabel} | Next scheduled: ${nextDate} at ${nextTime}`
+        : `[Follow-up Completed] ${noteContent}${batchLabel}`;
 
       await fetch('/api/activities', {
         method: 'POST',
@@ -243,9 +356,16 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
       <DialogContent className="bg-white max-w-lg p-0 rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
         <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-white pr-12">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
             <div className="flex items-center gap-2 min-w-0">
-              {showEditInfo ? (
+              {showChangeBatch ? (
+                <>
+                  <Luggage className="w-5 h-5 text-blue-900 shrink-0" />
+                  <DialogTitle className="text-base font-bold text-slate-900 truncate">
+                    Change Trip Batch
+                  </DialogTitle>
+                </>
+              ) : showEditInfo ? (
                 <>
                   <Edit3 className="w-5 h-5 text-blue-900 shrink-0" />
                   <DialogTitle className="text-base font-bold text-slate-900 truncate">
@@ -262,38 +382,195 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
               )}
             </div>
 
-            {/* Switch Mode Button */}
-            <button
-              type="button"
-              onClick={() => setShowEditInfo(!showEditInfo)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer shadow-2xs shrink-0 ${
-                showEditInfo
-                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300'
-                  : 'bg-white border-slate-300 text-slate-700 hover:bg-blue-50 hover:text-blue-900 hover:border-blue-300'
-              }`}
-            >
-              {showEditInfo ? (
-                <>
+            {/* Header Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              {showChangeBatch || showEditInfo ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangeBatch(false);
+                    setShowEditInfo(false);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer shadow-2xs"
+                >
                   <ArrowLeft className="w-3.5 h-3.5" /> Back to Follow-up
-                </>
+                </button>
               ) : (
                 <>
-                  <Edit3 className="w-3.5 h-3.5" /> Edit Info
+                  {/* Change Batch Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowChangeBatch(true);
+                      setShowEditInfo(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-blue-50 hover:text-blue-900 hover:border-blue-300 transition-all cursor-pointer shadow-2xs"
+                    title="Change trip batch"
+                  >
+                    <Luggage className="w-3.5 h-3.5 text-blue-900" />
+                    <span>Change Batch</span>
+                  </button>
+
+                  {/* Edit Info Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditInfo(true);
+                      setShowChangeBatch(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-blue-50 hover:text-blue-900 hover:border-blue-300 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" /> Edit Info
+                  </button>
                 </>
               )}
-            </button>
+            </div>
           </div>
 
           <DialogDescription className="text-xs text-slate-500 mt-1">
-            {showEditInfo
+            {showChangeBatch
+              ? `Select or update the trip batch for ${fullName || lead.full_name} (${formatPhoneNumber(lead.whatsapp_number)})`
+              : showEditInfo
               ? `Update details for ${fullName || lead.full_name} (${formatPhoneNumber(lead.whatsapp_number)})`
               : `Record call outcome, update lead status & stage for ${fullName || lead.full_name} (${formatPhoneNumber(lead.whatsapp_number)})`}
           </DialogDescription>
         </DialogHeader>
 
-        {showEditInfo ? (
+        {showChangeBatch ? (
           /* ========================================================= */
-          /* EDIT INFO VIEW ONLY - Name, City, Destination, Travel Date */
+          /* CHANGE TRIP BATCH VIEW                                    */
+          /* ========================================================= */
+          <>
+            <div className="p-6 space-y-4 overflow-y-auto">
+              {/* Current Batch Info Banner */}
+              <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-blue-900 mb-1 flex items-center gap-1.5">
+                  <Luggage className="w-3.5 h-3.5 text-blue-900" />
+                  Currently Assigned Batch
+                </div>
+                {currentSelectedBatch ? (
+                  <div className="text-xs text-slate-800">
+                    <div className="font-bold text-sm text-blue-950">
+                      {currentSelectedBatch.title || currentSelectedBatch.destination}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 mt-1.5 text-slate-600 text-[11px]">
+                      <span>📍 Destination: <strong className="text-slate-800">{currentSelectedBatch.destination}</strong></span>
+                      <span>📅 Date: <strong className="text-slate-800">{formatDateNumeric(currentSelectedBatch.proposed_date || currentSelectedBatch.start_date)}</strong></span>
+                      {currentSelectedBatch.proposed_price ? (
+                        <span>💰 Price: <strong className="text-slate-800">₹{currentSelectedBatch.proposed_price.toLocaleString()}</strong></span>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500 italic">
+                    No trip batch is currently assigned to this lead.
+                  </div>
+                )}
+              </div>
+
+              {/* Batches Selector List */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 block mb-2">
+                  Select Trip Batch
+                </Label>
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {batches.map((b) => {
+                    const isSelected = batchId === b.id;
+                    const dStr = b.proposed_date || b.start_date;
+                    const formattedDate = dStr ? formatDateNumeric(dStr) : 'Flexible';
+                    return (
+                      <div
+                        key={b.id}
+                        onClick={() => setBatchId(b.id)}
+                        className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-100 shadow-xs'
+                            : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-xs">
+                              {b.title || b.destination}
+                            </span>
+                            {isSelected && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#0e2a56] text-white">
+                                Selected
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-600">
+                            <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700 font-medium">
+                              📍 {b.destination}
+                            </span>
+                            <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700 font-medium">
+                              📅 {formattedDate}
+                            </span>
+                            {b.departure_city && (
+                              <span className="text-slate-500">
+                                from {b.departure_city}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          {b.proposed_price ? (
+                            <div className="font-bold text-blue-950 text-xs">
+                              ₹{b.proposed_price.toLocaleString()}
+                            </div>
+                          ) : null}
+                          <div className="text-[10px] text-slate-500 mt-0.5">
+                            {b.confirmed_pax || 0}/{b.capacity || 40} booked
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Option to clear batch */}
+                  <div
+                    onClick={() => setBatchId('none')}
+                    className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
+                      batchId === 'none' || !batchId
+                        ? 'bg-slate-100 border-slate-400 font-bold text-slate-800'
+                        : 'bg-white border-dashed border-slate-300 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>None (No Batch Assigned)</span>
+                    {(batchId === 'none' || !batchId) && <Check className="w-3.5 h-3.5 text-slate-700" />}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowChangeBatch(false)}
+                className="text-xs border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                Back to Follow-up
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSaveBatchOnly}
+                disabled={savingBatchOnly}
+                className="bg-[#0e2a56] hover:bg-[#0a1f42] text-white font-semibold text-xs gap-1.5 shadow-sm px-5 cursor-pointer"
+              >
+                {savingBatchOnly ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
+                Save Trip Batch
+              </Button>
+            </DialogFooter>
+          </>
+        ) : showEditInfo ? (
+          /* ========================================================= */
+          /* EDIT INFO VIEW ONLY - Name, City, Destination, Date, Batch */
           /* ========================================================= */
           <>
             <div className="p-6 space-y-4 overflow-y-auto">
@@ -346,6 +623,44 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Trip Batch */}
+              <div>
+                <Label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                  <Luggage className="w-3.5 h-3.5 text-slate-400" /> Trip Batch
+                </Label>
+                <Select
+                  value={batchId || 'none'}
+                  onValueChange={(val) => {
+                    setBatchId(val);
+                    const b = batches.find((item) => item.id === val);
+                    if (b?.destination && !preferredLocation) {
+                      setPreferredLocation(b.destination);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="mt-1 bg-white border-slate-300 text-slate-900 text-xs h-9">
+                    <SelectValue placeholder="-- Select Trip Batch --" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white text-slate-900 max-h-56">
+                    <SelectItem value="none" className="text-xs text-slate-500">
+                      -- No Batch Assigned --
+                    </SelectItem>
+                    {batches.map((b) => {
+                      const dStr = b.proposed_date || b.start_date;
+                      const formattedDate = dStr ? formatDateNumeric(dStr) : '';
+                      const title = b.title
+                        ? formattedDate ? `${b.title} (${formattedDate})` : b.title
+                        : `${b.destination} (${formattedDate})`;
+                      return (
+                        <SelectItem key={b.id} value={b.id} className="text-xs">
+                          {title}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Preferred Travel Date (Identical to Edit a Lead) */}
@@ -498,7 +813,71 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
                 </Select>
               </div>
 
-              {/* Section 3: Call Notes / Remarks */}
+              {/* Section 3: Trip Batch Selector & Change Button */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <Luggage className="w-3.5 h-3.5 text-blue-900" /> Trip Batch
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowChangeBatch(true);
+                      setShowEditInfo(false);
+                    }}
+                    className="text-[11px] font-bold text-blue-900 hover:text-blue-950 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArrowRightLeft className="w-3 h-3" /> Change Batch
+                  </button>
+                </div>
+                <Select
+                  value={batchId || 'none'}
+                  onValueChange={(val) => {
+                    setBatchId(val);
+                    const matched = batches.find((b) => b.id === val);
+                    if (matched?.destination && !preferredLocation) {
+                      setPreferredLocation(matched.destination);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-full bg-white border-slate-300 text-slate-900 text-xs h-9">
+                    <SelectValue placeholder="-- Select Trip Batch --" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white text-slate-900 max-h-56">
+                    <SelectItem value="none" className="text-xs text-slate-500">
+                      -- No Batch Assigned --
+                    </SelectItem>
+                    {batches.map((b) => {
+                      const dStr = b.proposed_date || b.start_date;
+                      const formattedDate = dStr ? formatDateNumeric(dStr) : '';
+                      const title = b.title
+                        ? formattedDate ? `${b.title} (${formattedDate})` : b.title
+                        : `${b.destination} (${formattedDate})`;
+                      return (
+                        <SelectItem key={b.id} value={b.id} className="text-xs">
+                          {title}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+
+                {/* Selected batch summary badge */}
+                {currentSelectedBatch && (
+                  <div className="mt-1.5 px-2.5 py-1.5 bg-blue-50/60 border border-blue-200/80 rounded-lg text-[11px] text-slate-700 flex items-center justify-between">
+                    <span>
+                      📍 <strong className="text-slate-900">{currentSelectedBatch.destination}</strong>
+                      {currentSelectedBatch.departure_city ? ` from ${currentSelectedBatch.departure_city}` : ''}
+                    </span>
+                    <span>
+                      📅 <strong className="text-slate-900">{formatDateNumeric(currentSelectedBatch.proposed_date || currentSelectedBatch.start_date)}</strong>
+                      {currentSelectedBatch.proposed_price ? ` • ₹${currentSelectedBatch.proposed_price.toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 4: Call Notes / Remarks */}
               <div>
                 <Label className="text-xs font-bold text-slate-700 mb-1.5 block">
                   Call Notes / Outcome <span className="text-slate-400 font-normal">(Optional)</span>
@@ -512,7 +891,7 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
                 />
               </div>
 
-              {/* Section 4: Schedule Next Follow-up */}
+              {/* Section 5: Schedule Next Follow-up */}
               <div className="pt-3 border-t border-slate-100 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
