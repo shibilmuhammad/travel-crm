@@ -21,7 +21,7 @@ import { useAuth } from '@/context/AuthContext';
 const PAGE_SIZE = 25;
 
 export default function LeadsPage() {
-  const { currentUser, isTelecaller, teamMembers } = useAuth();
+  const { currentUser, isTelecaller, isRealAdmin, teamMembers } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -74,7 +74,7 @@ export default function LeadsPage() {
       const params = new URLSearchParams();
       params.set('page_size', '500');
 
-      if (isTelecaller) {
+      if (!isRealAdmin) {
         params.set('assigned_team_member', currentUser?.full_name || currentUser?.name || '');
       } else if (currentFilters.assigned_team_member && currentFilters.assigned_team_member !== 'all') {
         params.set('assigned_team_member', currentFilters.assigned_team_member);
@@ -103,7 +103,7 @@ export default function LeadsPage() {
         setLoading(false);
       }
     }
-  }, [filters, isTelecaller, currentUser]);
+  }, [filters, isRealAdmin, currentUser]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -528,23 +528,29 @@ export default function LeadsPage() {
               </Select>
 
               {/* Assignee Filter */}
-              <Select
-                value={filters.assigned_team_member || 'all'}
-                onValueChange={(val) => setFilters({ ...filters, assigned_team_member: val })}
-              >
-                <SelectTrigger className="bg-white border-slate-300 text-slate-900 text-xs h-9">
-                  <SelectValue placeholder="All Assignees" />
-                </SelectTrigger>
-                <SelectContent className="bg-white text-slate-900">
-                  <SelectItem value="all">All Assignees</SelectItem>
-                  {teamMembers.map((m) => (
-                    <SelectItem key={m.id} value={m.full_name || m.name || 'Staff'}>
-                      {m.full_name || m.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="Unassigned">Unassigned</SelectItem>
-                </SelectContent>
-              </Select>
+              {isRealAdmin ? (
+                <Select
+                  value={filters.assigned_team_member || 'all'}
+                  onValueChange={(val) => setFilters({ ...filters, assigned_team_member: val })}
+                >
+                  <SelectTrigger className="bg-white border-slate-300 text-slate-900 text-xs h-9">
+                    <SelectValue placeholder="All Assignees" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white text-slate-900">
+                    <SelectItem value="all">All Assignees</SelectItem>
+                    {teamMembers.map((m) => (
+                      <SelectItem key={m.id} value={m.full_name || m.name || 'Staff'}>
+                        {m.full_name || m.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="Unassigned">Unassigned</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-9 px-3 rounded-md bg-slate-100 border border-slate-300 flex items-center text-xs font-semibold text-slate-700 select-none">
+                  {currentUser?.full_name || currentUser?.name || 'My Leads'}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 pt-1">

@@ -69,7 +69,7 @@ function getDateRangeFromPreset(preset: string): { start: string; end: string } 
 }
 
 export default function DashboardPage() {
-  const { currentUser, isTelecaller, teamMembers } = useAuth();
+  const { currentUser, isTelecaller, isRealAdmin, teamMembers } = useAuth();
 
   // Filters State
   const [datePreset, setDatePreset] = useState<string>('this_month');
@@ -79,8 +79,14 @@ export default function DashboardPage() {
   const [filterDestination, setFilterDestination] = useState<string>('all');
   const [filterSource, setFilterSource] = useState<string>('all');
   const [filterStaff, setFilterStaff] = useState<string>(
-    isTelecaller ? (currentUser?.full_name || currentUser?.name || 'all') : 'all'
+    !isRealAdmin ? (currentUser?.full_name || currentUser?.name || 'all') : 'all'
   );
+
+  useEffect(() => {
+    if (!isRealAdmin && currentUser) {
+      setFilterStaff(currentUser.full_name || currentUser.name || '');
+    }
+  }, [isRealAdmin, currentUser]);
 
   // Data State
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -489,7 +495,7 @@ export default function DashboardPage() {
     setCustomEnd('');
     setFilterDestination('all');
     setFilterSource('all');
-    setFilterStaff('all');
+    setFilterStaff(!isRealAdmin ? (currentUser?.full_name || currentUser?.name || 'all') : 'all');
   };
 
   return (
@@ -588,19 +594,25 @@ export default function DashboardPage() {
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                   Assigned Team Member
                 </label>
-                <Select value={filterStaff} onValueChange={setFilterStaff}>
-                  <SelectTrigger className="w-full h-8 text-xs bg-slate-50 border-slate-200">
-                    <SelectValue placeholder="All Staff" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white text-slate-900">
-                    <SelectItem value="all">All Team Members</SelectItem>
-                    {teamMembers.map((m) => (
-                      <SelectItem key={m.id} value={m.full_name || m.name || ''}>
-                        {m.full_name || m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isRealAdmin ? (
+                  <Select value={filterStaff} onValueChange={setFilterStaff}>
+                    <SelectTrigger className="w-full h-8 text-xs bg-slate-50 border-slate-200">
+                      <SelectValue placeholder="All Staff" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white text-slate-900">
+                      <SelectItem value="all">All Team Members</SelectItem>
+                      {teamMembers.map((m) => (
+                        <SelectItem key={m.id} value={m.full_name || m.name || ''}>
+                          {m.full_name || m.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="w-full h-8 px-2.5 rounded-md bg-slate-100 border border-slate-200 flex items-center text-xs font-semibold text-slate-700 select-none">
+                    {currentUser?.full_name || currentUser?.name || 'My Cohort'}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -37,7 +37,7 @@ const getLeadStatusPriority = (lead: Lead): number => {
 };
 
 export default function FollowupsPage() {
-  const { currentUser, isTelecaller, teamMembers } = useAuth();
+  const { currentUser, isTelecaller, isRealAdmin, teamMembers } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('today');
   const [selectedStaff, setSelectedStaff] = useState<string>('all');
 
@@ -192,7 +192,7 @@ export default function FollowupsPage() {
 
   // Telecaller / Staff filter logic
   const filteredLeadsByStaff = allLeads.filter((l) => {
-    if (isTelecaller) {
+    if (!isRealAdmin || isTelecaller) {
       const myName = currentUser?.full_name || currentUser?.name || '';
       return matchesStaff(l.assigned_team_member, myName);
     }
@@ -426,7 +426,7 @@ export default function FollowupsPage() {
           </div>
 
           {/* Telecaller Filter Dropdown */}
-          {!isTelecaller && (
+          {isRealAdmin && !isTelecaller && (
             <div className="flex items-center gap-2">
               <Select value={selectedStaff} onValueChange={setSelectedStaff}>
                 <SelectTrigger className="w-[180px] bg-white border-slate-300 text-xs font-semibold text-slate-800 rounded-lg shadow-2xs">

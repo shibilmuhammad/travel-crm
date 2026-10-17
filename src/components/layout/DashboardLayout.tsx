@@ -18,7 +18,7 @@ export function DashboardLayout({ children, title, description, actions }: Dashb
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [headerSearch, setHeaderSearch] = useState('');
-  const { currentUser, isAdmin, logout } = useAuth();
+  const { currentUser, isAdmin, isImpersonating, resetToAdmin, logout } = useAuth();
 
   const handleHeaderSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && headerSearch.trim()) {
@@ -38,6 +38,24 @@ export function DashboardLayout({ children, title, description, actions }: Dashb
 
       {/* Main Area */}
       <main className="flex-1 flex flex-col min-w-0 max-w-full overflow-hidden">
+        {/* Impersonation Banner for Admin */}
+        {isImpersonating && (
+          <div className="bg-amber-600 text-white text-xs px-3.5 sm:px-6 py-1.5 flex items-center justify-between font-medium shadow-xs shrink-0 z-20">
+            <div className="flex items-center gap-2 truncate">
+              <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+              <span className="truncate">
+                Admin Preview Mode: Viewing CRM as <strong>{currentUser.full_name || currentUser.name}</strong> ({currentUser.role})
+              </span>
+            </div>
+            <button
+              onClick={resetToAdmin}
+              className="bg-white text-amber-950 hover:bg-amber-100 px-2.5 py-0.5 rounded text-[11px] font-bold shadow-xs cursor-pointer transition-colors shrink-0 ml-2"
+            >
+              Exit to Admin
+            </button>
+          </div>
+        )}
+
         {/* Crisp White Header Bar matching Reference Image 1 */}
         <header className="flex-shrink-0 flex items-center justify-between px-3.5 sm:px-6 py-2.5 sm:py-3 border-b border-slate-200 bg-white shadow-xs min-w-0 max-w-full">
           <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">

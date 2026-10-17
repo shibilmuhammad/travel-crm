@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = usePathname();
-  const { currentUser, isAdmin, teamMembers, setCurrentUser, logout } = useAuth();
+  const { currentUser, isAdmin, isRealAdmin, isImpersonating, resetToAdmin, teamMembers, setCurrentUser, logout } = useAuth();
 
   const navItems = isAdmin
     ? [
@@ -96,40 +96,73 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
       {/* Account Switcher Widget */}
       {!collapsed && (
         <div className="p-3 border-t border-white/10 bg-[#091a38]">
-          <div className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 px-1">Switch User Account</div>
-          <Select
-            value={currentUser.id}
-            onValueChange={(id) => {
-              const selected = teamMembers.find((m) => m.id === id);
-              if (selected) setCurrentUser(selected);
-            }}
-          >
-            <SelectTrigger className="w-full bg-[#122e5e] border-blue-400/30 text-xs text-white h-9 focus:ring-sky-400">
-              <div className="flex items-center gap-2 truncate">
-                <div className="w-5 h-5 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center">
-                  {(currentUser.full_name || currentUser.name || 'U').charAt(0)}
-                </div>
-                <span className="truncate font-medium">{currentUser.full_name || currentUser.name}</span>
-                <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-blue-900/80 text-sky-200">
-                  {currentUser.role}
+          {isRealAdmin ? (
+            /* ADMIN ONLY: Admin can access any staff, and return to Admin */
+            <div>
+              <div className="flex items-center justify-between mb-1.5 px-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400">
+                  {isImpersonating ? 'Viewing as Staff' : 'Switch User Account'}
                 </span>
+                {isImpersonating && (
+                  <button
+                    type="button"
+                    onClick={resetToAdmin}
+                    className="text-[10px] text-sky-300 hover:text-white font-bold underline cursor-pointer"
+                  >
+                    Return to Admin
+                  </button>
+                )}
               </div>
-            </SelectTrigger>
-            <SelectContent className="bg-[#0e254e] border-blue-400/30 text-white">
-              {teamMembers.map((m) => (
-                <SelectItem key={m.id} value={m.id} className="text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{m.full_name || m.name}</span>
-                    <span className="text-[10px] text-sky-300 uppercase">({m.role})</span>
+              <Select
+                value={currentUser.id}
+                onValueChange={(id) => {
+                  const selected = teamMembers.find((m) => m.id === id);
+                  if (selected) setCurrentUser(selected);
+                }}
+              >
+                <SelectTrigger className="w-full bg-[#122e5e] border-blue-400/30 text-xs text-white h-9 focus:ring-sky-400">
+                  <div className="flex items-center gap-2 truncate">
+                    <div className="w-5 h-5 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                      {(currentUser.full_name || currentUser.name || 'U').charAt(0)}
+                    </div>
+                    <span className="truncate font-medium">{currentUser.full_name || currentUser.name}</span>
+                    <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-blue-900/80 text-sky-200">
+                      {currentUser.role}
+                    </span>
                   </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                </SelectTrigger>
+                <SelectContent className="bg-[#0e254e] border-blue-400/30 text-white">
+                  {teamMembers.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{m.full_name || m.name}</span>
+                        <span className="text-[10px] text-sky-300 uppercase">({m.role})</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            /* STAFF: Locked to their own profile. Cannot switch to admin or another staff */
+            <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-[#122e5e]/40 border border-blue-400/10">
+              <div className="w-8 h-8 rounded-full bg-sky-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                {(currentUser.full_name || currentUser.name || 'U').charAt(0)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold text-white truncate">
+                  {currentUser.full_name || currentUser.name}
+                </div>
+                <div className="text-[10px] text-sky-300 uppercase font-semibold">
+                  {currentUser.role}
+                </div>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={logout}
-            className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 text-xs font-bold transition-all cursor-pointer"
+            className="w-full mt-2.5 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 text-xs font-bold transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" /> Sign Out
           </button>
@@ -153,7 +186,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 export function MobileSidebar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { currentUser, isAdmin, teamMembers, setCurrentUser, logout } = useAuth();
+  const { currentUser, isAdmin, isRealAdmin, isImpersonating, resetToAdmin, teamMembers, setCurrentUser, logout } = useAuth();
 
   const navItems = isAdmin
     ? [
@@ -225,43 +258,80 @@ export function MobileSidebar() {
 
             {/* Mobile Account Switcher & Sign Out */}
             <div className="p-3 border-t border-white/10 bg-[#091a38]">
-              <div className="text-[10px] uppercase font-bold text-slate-400 mb-1.5 px-1">Switch Account</div>
-              <Select
-                value={currentUser.id}
-                onValueChange={(id) => {
-                  const selected = teamMembers.find((m) => m.id === id);
-                  if (selected) {
-                    setCurrentUser(selected);
-                    setOpen(false);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full bg-[#122e5e] border-blue-400/30 text-xs text-white h-9 focus:ring-sky-400">
-                  <div className="flex items-center gap-2 truncate">
-                    <div className="w-5 h-5 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
-                      {(currentUser.full_name || currentUser.name || 'U').charAt(0)}
-                    </div>
-                    <span className="truncate font-medium">{currentUser.full_name || currentUser.name}</span>
+              {isRealAdmin ? (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5 px-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">
+                      {isImpersonating ? 'Viewing as Staff' : 'Switch Account'}
+                    </span>
+                    {isImpersonating && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetToAdmin();
+                          setOpen(false);
+                        }}
+                        className="text-[10px] text-sky-300 hover:text-white font-bold underline cursor-pointer"
+                      >
+                        Return to Admin
+                      </button>
+                    )}
                   </div>
-                </SelectTrigger>
-                <SelectContent className="bg-[#0e254e] border-blue-400/30 text-white">
-                  {teamMembers.map((m) => (
-                    <SelectItem key={m.id} value={m.id} className="text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">{m.full_name || m.name}</span>
-                        <span className="text-[10px] text-sky-300 uppercase">({m.role})</span>
+                  <Select
+                    value={currentUser.id}
+                    onValueChange={(id) => {
+                      const selected = teamMembers.find((m) => m.id === id);
+                      if (selected) {
+                        setCurrentUser(selected);
+                        setOpen(false);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full bg-[#122e5e] border-blue-400/30 text-xs text-white h-9 focus:ring-sky-400">
+                      <div className="flex items-center gap-2 truncate">
+                        <div className="w-5 h-5 rounded-full bg-sky-500 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                          {(currentUser.full_name || currentUser.name || 'U').charAt(0)}
+                        </div>
+                        <span className="truncate font-medium">{currentUser.full_name || currentUser.name}</span>
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-blue-900/80 text-sky-200">
+                          {currentUser.role}
+                        </span>
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0e254e] border-blue-400/30 text-white">
+                      {teamMembers.map((m) => (
+                        <SelectItem key={m.id} value={m.id} className="text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{m.full_name || m.name}</span>
+                            <span className="text-[10px] text-sky-300 uppercase">({m.role})</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-[#122e5e]/40 border border-blue-400/10">
+                  <div className="w-8 h-8 rounded-full bg-sky-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                    {(currentUser.full_name || currentUser.name || 'U').charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-white truncate">
+                      {currentUser.full_name || currentUser.name}
+                    </div>
+                    <div className="text-[10px] text-sky-300 uppercase font-semibold">
+                      {currentUser.role}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={() => {
                   logout();
                   setOpen(false);
                 }}
-                className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 text-xs font-bold transition-all cursor-pointer"
+                className="w-full mt-2.5 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/20 text-xs font-bold transition-all cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" /> Sign Out
               </button>
