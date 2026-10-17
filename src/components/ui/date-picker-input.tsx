@@ -44,17 +44,15 @@ export function DatePickerInput({
     }
   };
 
-  const openPicker = () => {
-    if (disabled) return;
-    try {
-      datePickerRef.current?.showPicker();
-    } catch {
-      datePickerRef.current?.focus();
-    }
+  const handleNativeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const iso = e.target.value;
+    setDisplayValue(isoToDMY(iso));
+    onChange(iso);
   };
 
   return (
     <div className="relative w-full">
+      {/* Visual text input displaying DD/MM/YYYY */}
       <Input
         id={id}
         name={name}
@@ -62,33 +60,39 @@ export function DatePickerInput({
         placeholder={placeholder}
         value={displayValue}
         onChange={handleTextChange}
-        onClick={openPicker}
         disabled={disabled}
         required={required}
-        className={`pr-8 cursor-pointer font-medium ${className}`}
+        className={`pr-11 font-medium ${className}`}
       />
-      <button
-        type="button"
-        tabIndex={-1}
-        onClick={openPicker}
-        disabled={disabled}
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-        title="Open calendar"
+
+      {/* Visual Calendar Icon */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-11 flex items-center justify-center text-slate-400 pointer-events-none"
+        aria-hidden="true"
       >
-        <Calendar className="w-3.5 h-3.5 text-slate-500" />
-      </button>
+        <Calendar className="w-4 h-4 text-slate-500" />
+      </div>
+
+      {/* Real Native Date Input:
+          - On mobile (< 640px), covers the full input so tapping anywhere (especially the calendar icon) immediately opens the phone's native date picker (iOS wheel / Android dialog).
+          - On desktop (>= 640px), covers the right 44px (sm:w-11) over the calendar icon so clicking the calendar icon opens the picker while allowing keyboard typing in the text field.
+          - fontSize: 16px prevents iOS Safari from automatically zooming in when tapped.
+      */}
       <input
         ref={datePickerRef}
         type="date"
         value={value ? value.split('T')[0] : ''}
-        onChange={(e) => {
-          const iso = e.target.value;
-          setDisplayValue(isoToDMY(iso));
-          onChange(iso);
+        onChange={handleNativeChange}
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker?.();
+          } catch {}
         }}
         disabled={disabled}
-        className="sr-only"
         tabIndex={-1}
+        aria-label="Choose date"
+        style={{ fontSize: '16px' }}
+        className="absolute inset-y-0 right-0 w-full sm:w-11 opacity-0 cursor-pointer z-10 m-0 p-0"
       />
     </div>
   );

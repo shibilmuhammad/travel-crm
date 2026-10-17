@@ -103,7 +103,6 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
   const [assignedStaff, setAssignedStaff] = useState('Shibil Muhammad');
 
   // Follow-up Schedule State
-  const datePickerRef = useRef<HTMLInputElement>(null);
   const [followupDate, setFollowupDate] = useState('');
   const [followupDisplayDate, setFollowupDisplayDate] = useState('');
   const [followupTime, setFollowupTime] = useState('10:00 AM');
@@ -895,53 +894,14 @@ export function LeadDetailModal({ lead, onClose, onUpdate, onEdit, onDelete }: L
                   </span>
                 </div>
 
-                <div className="relative mt-1">
-                  <Input
-                    type="text"
-                    placeholder="dd/mm/yyyy"
-                    value={followupDisplayDate}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFollowupDisplayDate(val);
-                      const parsed = dmyToISO(val);
-                      if (/^\d{4}-\d{2}-\d{2}$/.test(parsed)) {
-                        setFollowupDate(parsed);
-                      }
-                    }}
-                    onClick={() => {
-                      try {
-                        datePickerRef.current?.showPicker();
-                      } catch {
-                        datePickerRef.current?.focus();
-                      }
-                    }}
-                    className="bg-white border-slate-300 text-slate-900 text-xs pr-8 font-medium cursor-pointer"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        datePickerRef.current?.showPicker();
-                      } catch {
-                        datePickerRef.current?.focus();
-                      }
-                    }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-                    title="Open calendar"
-                  >
-                    <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                  </button>
-                  <input
-                    ref={datePickerRef}
-                    type="date"
+                <div className="mt-1">
+                  <DatePickerInput
                     value={followupDate}
-                    onChange={(e) => {
-                      const iso = e.target.value;
+                    onChange={(iso) => {
                       setFollowupDate(iso);
                       setFollowupDisplayDate(isoToDMY(iso));
                     }}
-                    className="sr-only"
-                    tabIndex={-1}
+                    className="bg-white border-slate-300 text-slate-900 text-xs h-8"
                   />
                 </div>
 
