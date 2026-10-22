@@ -94,7 +94,7 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
   const [note, setNote] = useState('');
 
   // 4. Schedule Next Follow-up
-  const [scheduleNext, setScheduleNext] = useState(true);
+  const [scheduleNext, setScheduleNext] = useState(false);
   const [nextDate, setNextDate] = useState(getDateISO(1));
   const [nextTime, setNextTime] = useState('10:00 AM');
 
@@ -155,7 +155,7 @@ export function CompleteFollowupModal({ lead, open, onClose, onSuccess, onLeadUp
       setStage(currentStage);
 
       setNote('');
-      setScheduleNext(currentTemp !== 'not_interested');
+      setScheduleNext(false);
       setNextDate(getDateISO(1));
       setNextTime('10:00 AM');
 
